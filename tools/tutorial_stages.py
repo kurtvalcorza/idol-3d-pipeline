@@ -132,7 +132,7 @@ def require_cuda(stage: str) -> None:
 
     if not torch.cuda.is_available() and not os.environ.get("IDOL_ALLOW_CPU"):
         raise RuntimeError(
-            f"stage '{stage}' needs a CUDA GPU: Idol's 0.37 B-parameter denoiser runs 50 guided steps over 8,192 latent tokens, which takes tens of minutes per image on a CPU. In Colab choose Runtime -> Change runtime type -> T4 GPU, then Run all (set IDOL_ALLOW_CPU=1 to force the CPU anyway)."
+            f"stage '{stage}' needs a CUDA GPU that this environment's torch can use: Idol's 0.37 B-parameter denoiser runs 50 guided steps over 8,192 latent tokens (on a CPU, an estimated tens of minutes per image; not measured). If a GPU is attached, its driver may be too old for the CUDA 13 build in the lock (see Troubleshooting). In Colab choose Runtime -> Change runtime type -> T4 GPU, then Run all (set IDOL_ALLOW_CPU=1 to force the CPU anyway)."
         )
 
 
@@ -141,11 +141,40 @@ def require_cuda(stage: str) -> None:
 # --------------------------------------------------------------------------------------------------
 
 
+def install_manifests(run: Run) -> list[str]:
+    """Copy the carried manifests (ROOT/weights/<key>/) to the weights directory the stages read (WEIGHTS/<key>/).
+
+    The weights directory outlives a run directory, so a manifest already there must equal the carried one: a
+    different one means weights staged for another notebook revision, which is refused rather than mixed."""
+    from idol_3d_pipeline import SNAPSHOTS
+    from idol_3d_pipeline.pipeline import MANIFEST_NAME
+
+    installed = []
+    for key in SNAPSHOTS:
+        carried = run.root / "weights" / key / MANIFEST_NAME
+        if not carried.is_file():
+            if (run.weights / key / MANIFEST_NAME).is_file() and run.root.resolve() == run.weights.resolve().parent:
+                continue  # running from a repository checkout: the manifests already sit in weights/
+            raise FileNotFoundError(f"carried manifest missing: {carried}; run the Section 2 carrier cell first")
+        target = run.weights / key / MANIFEST_NAME
+        if target.is_file() and target.read_bytes() != carried.read_bytes():
+            raise RuntimeError(f"{target} differs from the manifest this notebook carries: the weights directory was staged by another revision. Delete {run.weights / key} (or start a fresh runtime) and run Section 3 again.")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.is_file():
+            target.write_bytes(carried.read_bytes())
+        installed.append(key)
+    return installed
+
+
 def stage_weights(run: Run) -> None:
     """Stage and digest-verify Idol, the klein VAE and DINOv3 at their pinned revisions."""
-    from idol_3d_pipeline import SNAPSHOTS, stage_snapshot, verify_snapshot
+    from idol_3d_pipeline import SNAPSHOTS, read_manifest, require_pinned, stage_snapshot, verify_snapshot
     from idol_3d_pipeline.pipeline import NON_COMMERCIAL_ORIGIN, check_upstream_config
 
+    install_manifests(run)
+    for key in SNAPSHOTS:  # every manifest must be pinned before a single byte is downloaded
+        require_pinned(key, read_manifest(key, run.weights))
+    in_manifests = {read_manifest(key, run.weights)["modelId"] for key in SNAPSHOTS}
     records = []
     for key, spec in SNAPSHOTS.items():
         started = time.perf_counter()
@@ -155,7 +184,7 @@ def stage_weights(run: Run) -> None:
         records.append(record)
         print({"snapshot": key, "model_id": record["model_id"], "revision": record["revision"][:12], "licence": record["license"], "files": len(record["files"]), "gib": round(record["total_bytes"] / 1024**3, 2), "verified": True, "fetched_now": len(fetched)})
     config = check_upstream_config(run.weights)
-    print({"idol_config_encoders": config["image_encoders"], "replaced_by": {"dinov3": "dinov3-vith16plus (local, verified)", "flux2_vae": "flux2-vae-klein (local, verified)"}, "contacts_non_commercial_origin": False, "non_commercial_origin_not_used": NON_COMMERCIAL_ORIGIN})
+    print({"idol_config_encoders": config["image_encoders"], "loaded_from": {"dinov3": "dinov3-vith16plus (same gated model, local verified copy)", "flux2_vae": "flux2-vae-klein (Apache-2.0 VAE, local verified copy)"}, "flux2_dev_in_any_staged_manifest": NON_COMMERCIAL_ORIGIN in in_manifests})
     run.write_state("weights.json", records)
 
 
@@ -234,7 +263,11 @@ def stage_generate(run: Run) -> None:
         record = _generate_one(pipe, run, open_sample(data[sample["id"]]), sample["id"], dict(samples[sample["id"]]["preset"]), run.out / sample["id"])
         records.append(record)
         print({k: record[k] for k in ("id", "gaussians", "camera", "seconds", "mask_replica_matches_sdk", "ply", "ply_bytes")})
-    run.write_output("generation.json", {"samples": records, "runtime": runtime_versions(), "snapshots": pipe.snapshots})
+    from idol_3d_pipeline import SDK_COMMIT
+
+    source = json.loads((run.root / "source.json").read_text(encoding="utf-8")) if (run.root / "source.json").is_file() else {}
+    provenance = {"notebook_source": {k: source.get(k) for k in ("repository", "revision", "generator")}, "idol_sdk_commit": SDK_COMMIT, "optimize": bool(run.options.optimize), "dinov3_dtype": run.options.dinov3_dtype, "sample_sha256": {s["id"]: s["sha256"] for s in samples.values()}}
+    run.write_output("generation.json", {"samples": records, "provenance": provenance, "runtime": runtime_versions(), "snapshots": pipe.snapshots})
     run.write_state("generated.json", [r["id"] for r in records])
 
 
@@ -263,6 +296,7 @@ def _evaluate_one(run: Run, name: str, out_dir: Path, convention: str | None = N
         "silhouette_iou_by_convention": ious,
         "convention_used": chosen,
         "silhouette_iou": ious[chosen],
+        "silhouette_iou_note": "the best of four camera readings, chosen by this IoU, so it is an upper bound for the reading used" if convention is None else "the reading fixed by the caller",
         "renderer": {"pairs": front["pairs"], "cut_at_max_radius": front["cut_at_max_radius"], "kind": "approximate NumPy EWA splatting (render.py), not the 3DGS rasterizer"},
     }
     model_input = Image.open(out_dir / f"{name}_input.png")
@@ -287,36 +321,52 @@ def stage_render(run: Run) -> None:
         "consistent_convention": len(conventions) == 1,
         "evidence_level": "structure and file integrity are checked; silhouette IoU covers the visible side only, through an approximate renderer; the unseen sides have no reference here",
     }
+    failed = [r["id"] for r in records if r["structure"]["verdict"] != "well-formed" or not r["ply_roundtrip"]["verified"]]
+    generation = json.loads((run.out / "generation.json").read_text(encoding="utf-8")) if (run.out / "generation.json").is_file() else {"samples": []}
+    failed += [s["id"] for s in generation["samples"] if s.get("mask_replica_matches_sdk") is False]
+    payload["verdict"] = "FAILED: " + ", ".join(sorted(set(failed))) if failed else "passed: every splat well-formed, every .ply read back, every mask replica equal to the SDK's input"
     run.write_output("evaluation.json", payload)
-    print({"conventions_chosen": payload["conventions_chosen"], "consistent_convention": payload["consistent_convention"], "previews": "outputs/previews.png", "record": "outputs/evaluation.json"})
+    print({"verdict": payload["verdict"], "conventions_chosen": payload["conventions_chosen"], "consistent_convention": payload["consistent_convention"], "previews": "outputs/previews.png", "record": "outputs/evaluation.json"})
+    if failed:
+        raise RuntimeError(f"checks failed for {sorted(set(failed))}; outputs/evaluation.json records which (the splats are not to be used as results)")
 
 
 def _byod_images(path_text: str) -> list[tuple[str, Path]]:
+    from idol_3d_pipeline import InputRefused
+
     if not path_text:
-        raise ValueError("BYOD_PATH is empty: point it at an image, a folder of images, or a .zip already in this runtime (or leave it empty in the notebook to get an upload dialog)")
+        raise InputRefused("BYOD_PATH is empty: point it at an image, a folder of images, or a .zip already in this runtime (or leave it empty in the notebook to get an upload dialog)")
     path = Path(path_text).expanduser()
     if not path.exists():
-        raise FileNotFoundError(f"BYOD_PATH {path} does not exist in this runtime")
-    if path.is_file() and path.suffix.lower() == ".zip":
-        target = path.with_suffix("")
-        with zipfile.ZipFile(path) as archive:
+        raise InputRefused(f"BYOD_PATH {path} does not exist in this runtime")
+    archives = [path] if path.is_file() and path.suffix.lower() == ".zip" else (sorted(path.rglob("*.zip")) if path.is_dir() else [])
+    for archive_path in archives:
+        target = archive_path.with_suffix("")
+        with zipfile.ZipFile(archive_path) as archive:
             for member in archive.infolist():
                 resolved = (target / member.filename).resolve()
-                if member.is_dir() or not resolved.is_relative_to(target.resolve()):
-                    continue  # skip directories and any entry that would escape the extraction folder
-                if Path(member.filename).suffix.lower() in BYOD_SUFFIXES and member.file_size < 64 * 1024 * 1024:
+                if member.is_dir():
+                    continue
+                if not resolved.is_relative_to(target.resolve()):
+                    print({"skipped_zip_entry": member.filename, "reason": "its path leaves the extraction folder"})
+                elif Path(member.filename).suffix.lower() not in BYOD_SUFFIXES:
+                    print({"skipped_zip_entry": member.filename, "reason": f"not an image ({', '.join(BYOD_SUFFIXES)})"})
+                elif member.file_size >= 64 * 1024 * 1024:
+                    print({"skipped_zip_entry": member.filename, "reason": "64 MB or larger"})
+                else:
                     resolved.parent.mkdir(parents=True, exist_ok=True)
                     resolved.write_bytes(archive.read(member))
-        path = target
+    if path.is_file() and path.suffix.lower() == ".zip":
+        path = path.with_suffix("")
     files = [path] if path.is_file() else sorted(p for p in path.rglob("*") if p.suffix.lower() in BYOD_SUFFIXES)
     if not files:
-        raise ValueError(f"no image ({', '.join(BYOD_SUFFIXES)}) found at {path}")
+        raise InputRefused(f"no image ({', '.join(BYOD_SUFFIXES)}) found at {path}")
     if len(files) > BYOD_MAX_IMAGES:
-        print({"note": f"{len(files)} images found; the first {BYOD_MAX_IMAGES} are used (about a minute or more each on a T4)"})
+        print({"note": f"{len(files)} images found; the first {BYOD_MAX_IMAGES} are used (each takes as long as one sample in Section 5)"})
     names: set[str] = set()
     out = []
     for file in files[:BYOD_MAX_IMAGES]:
-        stem = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in file.stem)[:40] or "image"
+        stem = "byod_" + ("".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in file.stem)[:40] or "image")  # never a sample id
         while stem in names:
             stem += "_"
         names.add(stem)
@@ -326,11 +376,14 @@ def _byod_images(path_text: str) -> list[tuple[str, Path]]:
 
 def stage_byod(run: Run) -> None:
     """Bring Your Own Data: the same validation, generation and checks on your images."""
+    import shutil
+
     from PIL import Image
 
-    from idol_3d_pipeline import validate_request
+    from idol_3d_pipeline import InputRefused, validate_request
 
     opts = run.options
+    shutil.rmtree(run.out / f"{STEM}_byod", ignore_errors=True)  # never show results of an earlier BYOD run
     images = _byod_images(opts.byod_path)
     settings = {"mode": opts.byod_mode, "seed": opts.seed, "steps": opts.steps, "num_gaussians": opts.num_gaussians}
     opened = []
@@ -339,7 +392,7 @@ def stage_byod(run: Run) -> None:
             image = Image.open(file)
             image.load()
         except Exception as error:  # an unreadable file is a refusal, not a crash
-            raise ValueError(f"{file.name}: not a readable image ({type(error).__name__}); supply PNG, JPEG, WebP or BMP") from None
+            raise InputRefused(f"{file.name}: not a readable image ({type(error).__name__}); supply PNG, JPEG, WebP or BMP") from None
         validate_request(image, mode=settings["mode"], steps=settings["steps"], num_gaussians=settings["num_gaussians"], name=file.name)
         opened.append((name, file, image))
     require_cuda("byod")
@@ -463,7 +516,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         STAGES[options.stage](run)
     except Exception as exc:  # the notebook re-raises this message in the kernel
-        traceback.print_exc()
+        if type(exc).__name__ != "InputRefused":  # a refused input is one message, not a traceback (DAT20)
+            traceback.print_exc()
         message = str(exc) or repr(exc)
         error_file.write_text(json.dumps({"stage": options.stage, "type": type(exc).__name__, "message": message}), encoding="utf-8")
         print(f"STAGE FAILED ({options.stage}): {type(exc).__name__}: {message}", flush=True)

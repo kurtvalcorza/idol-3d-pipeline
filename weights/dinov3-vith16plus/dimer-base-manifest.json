@@ -5,6 +5,10 @@
   "modelId": "facebook/dinov3-vith16plus-pretrain-lvd1689m",
   "revision": "c807c9eeea853df70aec4069e6f56b28ddc82acc",
   "license": "dinov3-license",
+  "modelFormat": "safetensors (transformers DINOv3ViTModel)",
+  "remoteCode": "none: transformers from PyPI, trust_remote_code is never set",
+  "redistribution": "the DINOv3 License permits redistribution with a copy of the licence and a 'Built with DINOv3' notice; not redistributed here, fetched from the gated origin with the user's HF_TOKEN (MODEL_ASSET_SPEC GATE1-GATE3: gate acceptance is the user's, not DIMER's)",
+  "assetSpec": "MODEL_ASSET_SPEC (ml-worker integrations/dimer/fleet-specs), section 6 provenance fields",
   "files": [
     {
       "path": "config.json",

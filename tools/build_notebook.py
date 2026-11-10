@@ -245,6 +245,7 @@ try:
 except FileNotFoundError:
     GPU = None
 STEM = {stem!r}
+REQUIRE_GPU = {require_gpu!r}
 RUNS = Path.cwd() / 'outputs' / STEM
 # Re-running this cell on its own keeps the run directory of this session, so the cells after it keep working; only a
 # new kernel (or NEW_RUN_DIRECTORY) starts a fresh one, which then needs Sections 2 and 3 again.
@@ -270,6 +271,8 @@ else:
     short = free['weights'] < need['weights'] or free['environment'] < need['environment']
 if short:
     raise RuntimeError(f'Not enough free disk: need about {{need}} GiB, free {{free}} GiB. Start a fresh runtime (see Troubleshooting).')
+if REQUIRE_GPU and not GPU:
+    raise RuntimeError('No GPU is attached. ' + REQUIRE_GPU + ' In Colab choose Runtime -> Change runtime type -> T4 GPU, then Run all; nothing has been downloaded yet.')
 print({{'gpu': GPU or 'none: the stages will run on the CPU (slower; see Prerequisites)', 'kernel_python': platform.python_version(), 'run_directory': str(ROOT), 'weights': str(WEIGHTS), 'environment': str(ENV_ROOT), 'free_gib': {{k: round(v, 1) for k, v in free.items()}}}})"""
 
 CARRIER_CELL = """# @title Infrastructure: write and verify the carried package, stage runner, lock and manifests
@@ -301,8 +304,8 @@ UV_SHA256 = {uv_sha256!r}
 ENV = dict(os.environ, HF_HUB_DISABLE_IMPLICIT_TOKEN='1', HF_HUB_DISABLE_TELEMETRY='1', DO_NOT_TRACK='1', UV_CACHE_DIR=str(ENV_ROOT / 'cache'), MPLBACKEND='Agg', ATTN_BACKEND='sdpa')
 for name in ('HF_TOKEN', 'HUGGING_FACE_HUB_TOKEN', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP'):
     ENV.pop(name, None)
-if globals().get('HF_TOKEN_VALUE'):
-    ENV['HF_TOKEN'] = HF_TOKEN_VALUE
+# Only these stages receive the token: uv, the package install, the probe and every other stage run without it.
+TOKEN_STAGES = {token_stages!r}
 PYTHON = ENV_ROOT / 'venv' / 'bin' / 'python'
 ENV_SPEC = {{'lock_sha256': CARRIED_HASHES[{lock!r}], 'python': {python!r}, 'uv': {uv_version!r}}}
 try:
@@ -353,7 +356,8 @@ def run_stage(stage, *options):
     command = [str(PYTHON), '-u', str(ROOT / {runner!r}), '--root', str(ROOT), '--weights', str(WEIGHTS), '--stage', stage, *map(str, options)]
     print('Running stage', repr(stage), 'in the isolated environment; log:', log, flush=True)
     with log.open('w', encoding='utf-8') as output:
-        process = subprocess.Popen(command, env=ENV, cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        stage_env = dict(ENV, HF_TOKEN=HF_TOKEN_VALUE) if stage in TOKEN_STAGES and globals().get('HF_TOKEN_VALUE') else ENV
+        process = subprocess.Popen(command, env=stage_env, cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         for line in process.stdout:
             output.write(line)
             output.flush()
@@ -414,7 +418,7 @@ def _probe(modules: list[str]) -> str:
 def _infrastructure_code(key: str, ctx: dict[str, Any], template: dict[str, Any]) -> str:
     if key == "check":
         disk = template["disk_gib"]
-        return CHECK_CELL.format(stem=template["stem"], weights_gib=float(disk["weights"]), env_gib=float(disk["environment"]), env_key=environment_key(ctx, template))
+        return CHECK_CELL.format(require_gpu=template.get("require_gpu", ""), stem=template["stem"], weights_gib=float(disk["weights"]), env_gib=float(disk["environment"]), env_key=environment_key(ctx, template))
     if key == "carrier":
         return CARRIER_CELL.format(files=repr(ctx["files"]), hashes=repr(ctx["hashes"]), source=SOURCE_RECORD)
     if key == "install":
@@ -429,6 +433,7 @@ def _infrastructure_code(key: str, ctx: dict[str, Any], template: dict[str, Any]
             probe=_probe(template["runtime_modules"]),
             n_locked=ctx["lock_packages"],
             runner=template["stage_runner"],
+            token_stages=sorted(template.get("token_stages", [])),
         )
     if key == "weights":
         return WEIGHTS_CELL
@@ -451,7 +456,7 @@ def render(repo: Path, template: dict[str, Any], revision: str | None = None) ->
         cells.append(cell)
 
     badges = " ".join(f"[![{alt}]({img})]({link})" for alt, img, link in template["badges"])
-    total_mb = sum(m["totalBytes"] for m in ctx["manifests"].values()) / 1e6
+    total_mb = ctx["manifests"][f"weights/{template['weights_key']}/dimer-base-manifest.json"]["totalBytes"] / 1e6  # the main snapshot only
     pinned = ctx["MODEL_REVISION"] != "unpinned"
     revision_text = (
         f"the Hugging Face Hub at the immutable revision `{ctx['MODEL_REVISION']}` (~{total_mb:.0f} MB, digest-verified before loading)"
@@ -467,8 +472,8 @@ def render(repo: Path, template: dict[str, Any], revision: str | None = None) ->
         f"**Notebook specification:** DIMER Notebook Specification {NOTEBOOK_SPEC} — **standalone** (§4)  \n"
         f"**Capability:** {template['capability']}\n\n"
         f"**This notebook is standalone.** Section 2 carries the repository's package ({len(ctx['modules'])} modules under "
-        f"`src/{ctx['pkg']}/`, at revision `{ctx['revision'][:12]}`), the stage runner, the hash-locked requirements "
-        f"({ctx['lock_packages']} packages), the snapshot manifest and the licence, and verifies every carried file "
+        f"`src/{ctx['pkg']}/`, at revision `{ctx['revision'][:12]}`){template.get('carried_extra', '')}, the stage runner, the hash-locked requirements "
+        f"({ctx['lock_packages']} packages), the {len(ctx['manifests'])} snapshot manifests and the licence, and verifies every carried file "
         f"against its SHA-256 before use, so the notebook keeps working after export even if the repository changes or disappears. "
         f"Nothing is installed into the notebook kernel: a pinned `uv` (checked by size and SHA-256) builds an isolated Python "
         f"environment from the lock with `--require-hashes`, and every stage runs there in its own process, so the hosted "
@@ -488,7 +493,7 @@ def render(repo: Path, template: dict[str, Any], revision: str | None = None) ->
 
     prereq = list(template["prerequisites"]) + [
         f"- **External access:** the Hugging Face Hub, to fetch the `{ctx['MODEL_ID']}` snapshot "
-        f"(~{total_mb:.0f} MB) at the revision in the carried manifest (`{ctx['MODEL_REVISION'][:12]}`); "
+        f"(~{total_mb:.0f} MB) at the revision in the carried manifest (`{ctx['MODEL_REVISION'][:12]}`); {template.get('external_extra', '')}"
         f"PyPI (`files.pythonhosted.org`), for the pinned `uv` wheel and the {ctx['lock_packages']} hash-locked packages; and "
         f"the managed CPython build (python-build-standalone) that `uv` downloads for the isolated environment. No repository "
         + ("clone is required; nothing is installed from this repository. **Credential:** " + template["credential"].strip() if template.get("credential") else "clone and no credentials are required; nothing is installed from this repository.")
@@ -517,6 +522,7 @@ def render(repo: Path, template: dict[str, Any], revision: str | None = None) ->
             "colab": {"gpuType": "T4", "name": template["notebook_name"], "provenance": []},
             "dimer": {
                 "notebook_profile": template["profile"],
+                "notebook_kind": template.get("kind", "TUTORIAL"),
                 "notebook_mode": mode,
                 "notebook_spec": NOTEBOOK_SPEC,
                 "standalone": True,

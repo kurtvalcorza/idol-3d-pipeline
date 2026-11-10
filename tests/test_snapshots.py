@@ -88,6 +88,19 @@ def test_stage_then_verify_fetches_only_missing_files_at_the_pinned_revision(tmp
     assert stage_snapshot("flux2-vae-klein", root, downloader=downloader) == []
 
 
+def test_the_real_downloader_never_falls_back_to_an_implicit_token(monkeypatch, tmp_path):
+    import huggingface_hub
+
+    from idol_3d_pipeline import pipeline
+
+    seen = {}
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", lambda *a, **k: seen.update(k))
+    pipeline._hub_download("speridlabs/idol", "config.json", "0" * 40, tmp_path, None)
+    assert seen["token"] is False
+    pipeline._hub_download("x/y", "f", "0" * 40, tmp_path, "secret")
+    assert seen["token"] == "secret"
+
+
 def test_tampered_or_missing_files_are_refused(tmp_path):
     files = {"vae/config.json": b"{}", "vae/diffusion_pytorch_model.safetensors": b"weights"}
     root = _fake_snapshot(tmp_path, "flux2-vae-klein", files)

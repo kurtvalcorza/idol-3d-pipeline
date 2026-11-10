@@ -5,6 +5,10 @@
   "modelId": "black-forest-labs/FLUX.2-klein-4B",
   "revision": "e7b7dc27f91deacad38e78976d1f2b499d76a294",
   "license": "apache-2.0",
+  "modelFormat": "safetensors (diffusers AutoencoderKLFlux2)",
+  "remoteCode": "none: diffusers from PyPI",
+  "redistribution": "Apache-2.0 permits redistribution; not redistributed here, fetched from the origin at the pinned revision",
+  "assetSpec": "MODEL_ASSET_SPEC (ml-worker integrations/dimer/fleet-specs), section 6 provenance fields",
   "files": [
     {
       "path": "vae/config.json",

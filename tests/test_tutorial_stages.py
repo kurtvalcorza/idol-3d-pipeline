@@ -67,7 +67,7 @@ def test_byod_refuses_bad_paths_before_loading_any_model(tmp_path):
     Image.new("RGB", (16, 16)).save(tiny)
     assert _run(tmp_path, "byod", "--byod-path", str(tiny)) == 2
     error = json.loads((tmp_path / "run" / "state" / "byod.error.json").read_text())
-    assert error["type"] == "ValueError" and "tiny.png" in error["message"] and "shorter side" in error["message"]
+    assert error["type"] == "InputRefused" and "tiny.png" in error["message"] and "shorter side" in error["message"]
 
 
 def test_byod_zip_extraction_ignores_entries_that_escape(tmp_path):
@@ -78,8 +78,37 @@ def test_byod_zip_extraction_ignores_entries_that_escape(tmp_path):
         zf.write(buffer, "inside/a.png")
         zf.writestr("../escape.png", b"x")
     found = stages._byod_images(str(archive))
-    assert [name for name, _ in found] == ["a"]
+    assert [name for name, _ in found] == ["byod_a"]
     assert not (tmp_path / "escape.png").exists()
+
+
+def test_byod_extracts_a_zip_uploaded_into_a_folder(tmp_path):
+    upload = tmp_path / "upload"
+    upload.mkdir()
+    image = tmp_path / "backpack.png"
+    Image.new("RGB", (128, 128)).save(image)
+    with zipfile.ZipFile(upload / "photos.zip", "w") as zf:
+        zf.write(image, "backpack.png")
+    found = stages._byod_images(str(upload))
+    assert [name for name, _ in found] == ["byod_backpack"], "a BYOD name never collides with a sample id"
+
+
+def test_weights_stage_installs_the_carried_manifests_and_refuses_a_different_one(tmp_path):
+    from idol_3d_pipeline import SNAPSHOTS
+
+    run_root, weights = tmp_path / "run", tmp_path / "weights"
+    for key in SNAPSHOTS:
+        source = ROOT / "weights" / key / "dimer-base-manifest.json"
+        (run_root / "weights" / key).mkdir(parents=True)
+        (run_root / "weights" / key / "dimer-base-manifest.json").write_bytes(source.read_bytes())
+    options = stages.parse_args(["--root", str(run_root), "--weights", str(weights), "--stage", "weights"])
+    run = stages.Run(run_root, weights, options)
+    assert stages.install_manifests(run) == list(SNAPSHOTS)
+    carried = (ROOT / "weights" / "idol" / "dimer-base-manifest.json").read_bytes()
+    assert (weights / "idol" / "dimer-base-manifest.json").read_bytes() == carried
+    (weights / "idol" / "dimer-base-manifest.json").write_text("{}")
+    with pytest.raises(RuntimeError, match="another revision"):
+        stages.install_manifests(run)
 
 
 def test_vae_check_needs_a_token(tmp_path, monkeypatch):

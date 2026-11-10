@@ -69,7 +69,9 @@ def test_token_is_read_once_passed_to_stages_and_never_printed(notebook):
     assert len(token_cells) == 1
     assert "print(HF_TOKEN_VALUE" not in token_cells[0] and "len(HF_TOKEN_VALUE)" in token_cells[0]
     install = next(s for s in sources if "def run_stage" in s)
-    assert "ENV['HF_TOKEN'] = HF_TOKEN_VALUE" in install
+    assert "TOKEN_STAGES = ['vae_check', 'weights']" in install, "only the gated-download stages receive the token"
+    assert "stage_env = dict(ENV, HF_TOKEN=HF_TOKEN_VALUE) if stage in TOKEN_STAGES" in install
+    assert "ENV['HF_TOKEN']" not in install, "uv, the install and the probe must run without the token"
     assert all("write_text(HF_TOKEN_VALUE" not in s for s in sources)
 
 
@@ -85,3 +87,9 @@ def test_lock_pins_every_runtime_dependency_with_hashes():
     lock = (ROOT / "tutorials" / "requirements-colab.lock.txt").read_text(encoding="utf-8")
     build.check_lock(build._pins(ROOT), lock)
     assert "flash-attn" not in lock and "flash_attn" not in lock
+
+
+def test_section_1_refuses_a_runtime_without_gpu_before_any_download(notebook):
+    check = next(_source(c) for c in notebook["cells"] if c["cell_type"] == "code" and "REQUIRE_GPU" in _source(c))
+    assert "if REQUIRE_GPU and not GPU:" in check and "nothing has been downloaded yet" in check
+    assert notebook["metadata"]["dimer"]["notebook_kind"] == "TUTORIAL"

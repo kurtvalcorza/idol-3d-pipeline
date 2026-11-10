@@ -5,6 +5,10 @@
   "modelId": "speridlabs/idol",
   "revision": "2731c2291fc65a797c5cb627a5e5526fc1490902",
   "license": "apache-2.0",
+  "modelFormat": "safetensors",
+  "remoteCode": "none: no Hub-hosted code is executed; the model classes come from the Idol SDK carried verbatim at speridlabs/idol-sdk@8db7003",
+  "redistribution": "Apache-2.0 permits redistribution; this repository does not redistribute the weights, the notebook fetches them from the origin at the pinned revision",
+  "assetSpec": "MODEL_ASSET_SPEC (ml-worker integrations/dimer/fleet-specs), section 6 provenance fields",
   "files": [
     {
       "path": "config.json",

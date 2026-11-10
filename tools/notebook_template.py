@@ -67,13 +67,18 @@ TEMPLATE = {
     "gated_model": GATED,
     "credential": (
         f"a Hugging Face token, read from this runtime's secrets as `HF_TOKEN` by the Section 2 Token cell, of an account that has accepted the DINOv3 terms at https://huggingface.co/{GATED} (approval is manual and can take a while). "
-        "It is passed only to the stage processes, used only for that gated snapshot, and never printed or written to disk. "
-        "Because the default path needs it, this notebook does not meet NOTEBOOK_SPEC RUN13/MOD4 and stays a Candidate (see STATUS.md)."
+        "It is passed only to the `weights` stage (for that gated snapshot) and, if you switch it on, the optional `vae_check` stage (for FLUX.2-dev); uv, the package install and every other stage run without it, and it is never printed or written to disk. "
+        "Because the default path needs it, this notebook does not meet NOTEBOOK_SPEC RUN13/MOD4 (nor RUN14 or REL6, which follow from them) and stays a Candidate (see STATUS.md)."
     ),
+    "token_stages": ["weights", "vae_check"],
+    "kind": "TUTORIAL",
+    "require_gpu": "Idol's generation stage needs a CUDA GPU (on a CPU it would take an estimated tens of minutes per image), so this notebook stops here rather than after building the environment and downloading about 6.6 GB.",
+    "carried_extra": ", the Idol SDK carried verbatim (13 modules under `src/idol/`, upstream commit `8db7003`)",
+    "external_extra": "the `black-forest-labs/FLUX.2-klein-4B` VAE (`vae/` only, 168 MB) and the gated `facebook/dinov3-vith16plus-pretrain-lvd1689m` encoder (an estimated 3.4 GB: 840.6 M parameters, if stored in fp32; the exact size is recorded once it is pinned) at the revisions in their manifests, with the token below; `raw.githubusercontent.com` for the two sample images; ",
     "run_all": (
         "Selecting **Run all** in a fresh Linux runtime with a CUDA GPU (a Colab T4 is the documented target) and an `HF_TOKEN` secret (see **Credential** in the Prerequisites) builds an isolated Python "
         "environment from the carried hash-locked requirements (torch, transformers, diffusers, tensordict and their dependencies) without touching the notebook kernel's own packages, then runs each "
-        "stage below in its own process: it stages and digest-verifies three pinned snapshots (Idol's 3.08 GB of weights, the 0.17 GB FLUX.2 [klein] VAE and the DINOv3 ViT-H+/16 encoder), fetches two "
+        "stage below in its own process: it stages and digest-verifies three pinned snapshots (Idol's 3.08 GB of weights, the 0.17 GB FLUX.2 [klein] VAE and the DINOv3 ViT-H+/16 encoder, an estimated 3.4 GB; about 6.6 GB in all), fetches two "
         "pinned sample images from the Idol SDK, validates them, turns each into a 3D Gaussian splat of 262,144 Gaussians written as a standard 3DGS `.ply`, and checks and previews every splat. "
         "The default path needs no repository clone, no DIMER worker or service, no upload dialog, no configuration edit and no runtime restart; it does need the token above. No hosted run of this "
         "notebook has been recorded yet (see `docs/release-verification.md`)."
@@ -81,7 +86,7 @@ TEMPLATE = {
     "byod": (
         "After the default path completes, Section 9 runs the same validation, generation and checks on your own images: set `USE_BYOD = True`, choose `BYOD_MODE` — `'real'` for photographs "
         "(a looser crop) or `'synthetic'` for renders and generated images — and either set `BYOD_PATH` to an image, folder or zip already in the runtime or leave it empty to get an upload dialog. "
-        "Up to four images are used; each takes about a minute or more on a T4. Uploaded files stay inside this runtime. BYOD is optional and never part of the default path."
+        "Up to four images are used; each takes about as long as one sample in Section 5. Uploaded files stay inside this runtime. BYOD is optional and never part of the default path."
     ),
     "weights_key": "idol",
     "carried": CARRIED,
@@ -94,17 +99,17 @@ TEMPLATE = {
         "bytes": 20081404,
         "sha256": "aee9802f46bae436bd91751bb33ddeb379ef1596b5c19df193219d545d244b60",
     },
-    "disk_gib": {"weights": 5.5, "environment": 9},
+    "disk_gib": {"weights": 7.5, "environment": 9},
     "runtime_modules": ["torch", "transformers", "diffusers", "numpy", "PIL"],
     "title": "Idol — DIMER Guided Notebook: one image to a 3D Gaussian splat (task inference, standalone)",
     "badges": BADGES,
     "capability": "single-image to 3D Gaussian splat generation with Idol (a 0.37 B-parameter flow-matching DiT with octree and Gaussian decoders), on Apache-2.0 FLUX.2 [klein] VAE conditioning in place of the non-commercial FLUX.2 [dev] VAE, with structural, file and input-view silhouette checks",
     "intro": (
-        "Idol (Sperid Labs, 2026) turns one picture of an object into a 3D Gaussian splat: up to a million small, coloured, semi-transparent 3D blobs that together form the object, including the "
-        "sides the picture never showed. Five networks run in order. **BiRefNet** (Zheng et al., 2024) cuts the object out and the image is framed on black at 1024 × 1024. Two image encoders read "
-        "it: **DINOv3** (Siméoni et al., 2025) for what the object is, and the **FLUX.2 VAE** for how its pixels look. A **diffusion transformer** trained with flow matching (Lipman et al., 2023) "
+        "Idol [1] turns one picture of an object into a 3D Gaussian splat: up to a million small, coloured, semi-transparent 3D blobs that together form the object, including the "
+        "sides the picture never showed. Six networks run in order. **BiRefNet** [5] cuts the object out and the image is framed on black at 1024 × 1024. Two image encoders read "
+        "it: **DINOv3** [4] for what the object is, and the **FLUX.2 VAE** [7] for how its pixels look. A **diffusion transformer** trained with flow matching [3] "
         "turns noise into an 8,192 × 16 object latent and a predicted camera in 50 Euler steps with classifier-free guidance. An **octree decoder** places anchor points on a 256³ grid, and a "
-        "**Gaussian decoder** turns each anchor into 32 Gaussians (Kerbl et al., 2023), written as a `.ply` any splat viewer opens.\n\n"
+        "**Gaussian decoder** turns each anchor into 32 Gaussians [2], written as a `.ply` any splat viewer opens.\n\n"
         "One change sets this notebook apart from the upstream SDK. Idol's own configuration loads the VAE from `black-forest-labs/FLUX.2-dev`, which is under the FLUX Non-Commercial License. "
         "This notebook loads the same VAE architecture from `black-forest-labs/FLUX.2-klein-4B`, released under Apache-2.0; its configuration names FLUX.2-dev as its origin, and the optional "
         "Section 8 tests whether the weights are the same. Nothing is trained here: this is a pretrained model used as published, which is why the profile is task inference."
@@ -124,7 +129,8 @@ TEMPLATE = {
     ),
     "prerequisites": [
         "- **Runtime:** a fresh **Linux x86_64** runtime with a **CUDA GPU**; a Colab T4 (16 GB) is the documented target. Idol's card gives a 7.2 GB VRAM peak per request. The generation stage refuses a CPU-only runtime with a message (tens of minutes per image otherwise). The kernel's own Python version does not matter: the notebook installs nothing into it and runs every stage with CPython 3.12.12 in an isolated environment built from {n_locked} hash-locked packages. The Section 1 check asks for about 9 GB of free disk for that environment and 5.5 GB for the weights and samples.",
-        "- **Time:** not yet measured for this notebook. Idol's card reports 54.6 s per image on an L4 with compilation on; this notebook runs eagerly by default (`OPTIMIZE = False` in Section 5), which is slower but avoids a compile step on the T4. Downloading about 5 GB of weights takes a few minutes.",
+        "- **Time:** not yet measured for this notebook; the figures here are estimates. Idol's card reports 54.6 s per image on an L4 with compilation on; this notebook runs eagerly by default (`OPTIMIZE = False` in Section 5), which is slower but avoids a compile step on the T4. Downloading about 6.6 GB of weights takes several minutes.",
+        "- **Precision, seeds and variation:** DINOv3 and the FLUX.2 VAE run in bf16, BiRefNet in fp16 on CUDA, the denoiser and decoders as the SDK sets them (fp16 transformer blocks with fp32 embeddings and norms). Each sample uses its upstream preset seed (42 for the backpack, 7 for the armchair); BYOD uses seed 42. GPU kernels are not bitwise deterministic, so splats and the scores in Section 6 can differ slightly between runs and GPUs.",
         "- **Knowledge:** you can run notebook cells and read short Python. No prior experience with 3D reconstruction is assumed; the glossary defines the terms.",
         "- **Weights:** only `.safetensors` files are loaded, each checked by size and SHA-256 against the carried manifests before any model code runs. The Idol SDK is carried verbatim at commit `8db7003` (Apache-2.0) and verified like every carried file; no Hub-hosted code is executed. Idol's weights and the klein VAE are Apache-2.0; DINOv3 is under the DINOv3 License.",
         "- **Pin status:** Idol and the klein VAE are pinned by commit and per-file SHA-256. DINOv3 is pinned by commit; its per-file digests are recorded by `tools/pin_snapshot.py` with access to the gated repository. If the carried DINOv3 manifest still lists a file without a digest, Section 3 stops with that message instead of loading unverified weights.",
@@ -134,6 +140,16 @@ TEMPLATE = {
     ],
     "guided": {
         "opening": [
+            (
+                "## Problem statement\n\n"
+                "A single photograph of an object fixes only one side of it. Turning it into a 3D object a viewer can rotate means predicting the rest. This notebook asks what a learner can check about such a prediction "
+                "without any 3D ground truth, and shows how a licence constraint on one component (the FLUX.2-dev VAE) was met without retraining the model.\n\n"
+                "## Data context\n\n"
+                "The two default inputs are example images from the Idol SDK's own demo (`demo/examples/` in [speridlabs/idol-sdk](https://github.com/speridlabs/idol-sdk/tree/8db700349a5570aac390e4780fa32e3eed6b587a/demo/examples) "
+                "at commit `8db7003`, Apache-2.0), run with the settings in its `presets.json`. The SDK does not say how they were made; their style suggests renders or generated images, the `synthetic` "
+                "input kind Idol's default mode is for. Idol's training data is not described upstream, so these images may resemble, or come from the same source as, what the model was trained on: treat "
+                "every result here as tutorial evidence about these two images, not as an estimate of how Idol does on new objects. Your own photographs go through Section 9 in `real` mode."
+            ),
             (
                 "## How to use this notebook\n\n"
                 "**Running it.** In Colab choose *Runtime → Change runtime type → T4 GPU*, add the `HF_TOKEN` secret (key icon on the left; switch on notebook access), then *Runtime → Run all*. "
@@ -200,7 +216,7 @@ TEMPLATE = {
             "code": "OPTIMIZE = False  # @param {{type:\"boolean\"}}\nrun_stage('generate', *(['--optimize'] if OPTIMIZE else []))\ngeneration = load_record('generation.json')\nfor sample in generation['samples']:\n    print({{k: sample[k] for k in ('id', 'gaussians', 'seconds', 'camera', 'mask_replica_matches_sdk', 'ply_bytes')}})",
         },
         {
-            "md": "**What to notice.** Each sample reports 262,144 Gaussians, a predicted camera, and `mask_replica_matches_sdk: True`, meaning the mask this package rebuilt comes from exactly the image Idol saw. The `seconds` are this runtime's measurement; compare them with your prediction.\n\n## 6. Check and preview each splat [Evaluation practice]\n\nThere is no ground-truth 3D for these images, so the checks are the ones that need none. **Structure:** the Gaussians are finite, inside Idol's [-0.5, 0.5]³ box, with unit rotations and opacities in [0, 1]. **File:** the `.ply` reads back with the standard 3DGS fields and the same positions. **Input view:** the splat is rendered from the camera Idol predicted, and its silhouette is compared with the object mask (IoU). Idol's SDK does not document which way its camera direction points or the image's handedness, so the stage scores all four readings and reports each.\n\n**Predict before running.** If the camera and the renderer agree with Idol's, should the silhouette IoU at the input view be near 0.5, near 0.9, or near 1.0? Why not exactly 1.0?",
+            "md": "<details>\n<summary><strong>Check your reasoning</strong></summary>\n\nSlower. A T4 has roughly half an L4's fp16 throughput, and eager mode gives up the card's ~1.7× speed-up from compilation and batched guidance, so several times the L4 figure is a reasonable expectation. The measured `seconds` below replace that estimate for this runtime.\n</details>\n\n**What to notice.** Each sample reports 262,144 Gaussians, a predicted camera, and `mask_replica_matches_sdk: True`, meaning the mask this package rebuilt comes from exactly the image Idol saw. The `seconds` are this runtime's measurement; compare them with your prediction.\n\n## 6. Check and preview each splat [Evaluation practice]\n\nThere is no ground-truth 3D for these images, so the checks are the ones that need none. **Structure:** the Gaussians are finite, their centres within ±0.55 of the origin (Idol's [-0.5, 0.5]³ box plus a 0.05 margin for the decoder's offsets), with unit rotations and opacities in [0, 1]. **File:** the `.ply` reads back with the same count, the standard 3DGS fields and the same positions to within 10⁻⁵. If a structure or file check fails, or the rebuilt mask does not match the SDK's input, the stage stops after writing its record. **Input view:** the splat is rendered from the camera Idol predicted, and its silhouette is compared with the object mask (IoU). Idol's SDK does not document which way its camera direction points or the image's handedness, so the stage scores all four readings and reports each; the reported IoU is the best of the four, so it is an upper bound for the reading it picks.\n\n**Predict before running.** If the camera and the renderer agree with Idol's, should the silhouette IoU at the input view be near 0.5, near 0.9, or near 1.0? Why not exactly 1.0?",
             "code": "run_stage('render')\nshow_image('previews.png', 'Model input, mask, render from the predicted camera, and three turned views')\nevaluation = load_record('evaluation.json')\nfor sample in evaluation['samples']:\n    print({{'id': sample['id'], 'structure': sample['structure']['verdict'], 'ply_verified': sample['ply_roundtrip']['verified'], 'silhouette_iou': sample['silhouette_iou'], 'by_convention': sample['silhouette_iou_by_convention']}})\nprint({{'convention': evaluation['conventions_chosen'], 'consistent': evaluation['consistent_convention']}})",
         },
         {
@@ -210,8 +226,8 @@ TEMPLATE = {
         {
             "md": (
                 "## Interpretation and conclusion [Evaluation practice]\n\n"
-                "**What this run shows.** Idol ran from digest-verified snapshots with both of its gated encoders replaced, one of them by an Apache-2.0 copy of the VAE architecture, and produced well-formed splats whose `.ply` files read back exactly. The silhouette IoU says how well the visible side lines up with the input, through an approximate renderer.\n\n"
-                "**What it does not show.** That the unseen sides are right: there is no reference for them here. That the klein VAE equals the dev VAE: Section 8 tests that and needs FLUX.2-dev access. That two images represent anything beyond themselves.\n\n"
+                "**What this run shows.** Idol ran from digest-verified local snapshots: DINOv3 is the same gated model Idol names, and the VAE is the Apache-2.0 FLUX.2 [klein] copy in place of FLUX.2-dev. It produced well-formed splats whose `.ply` files read back with the same count, fields and positions. The silhouette IoU says how well the visible side lines up with the input, through an approximate renderer [6].\n\n"
+                "**What it does not show.** That the unseen sides are right: there is no reference for them here. That the klein VAE equals the dev VAE: Section 8 tests that and needs FLUX.2-dev access. That two images represent anything beyond themselves: they come from the model's own demo and may resemble its undisclosed training data, so this is tutorial evidence, not a performance estimate.\n\n"
                 "**Write your conclusion** in three sentences: what was generated, which checks passed with which numbers, and the one limit you consider most important.\n\n"
                 "## 8. Optional: is the klein VAE the FLUX.2-dev VAE? [Evaluation practice]\n\n"
                 "Off by default. With `RUN_VAE_CHECK` ticked and an `HF_TOKEN` whose account has accepted the FLUX.2-dev terms, the `vae_check` stage downloads the dev VAE (336 MB) for this check only, compares every tensor cast to bf16 with the klein VAE bit for bit, and runs Idol's own VAE encoding with each on the same image beside a dev-vs-dev rerun that measures this GPU's noise floor. FLUX.2-dev is never used for generation."
@@ -220,7 +236,7 @@ TEMPLATE = {
         },
         {
             "md": "## 9. Optional: Bring Your Own Data [Evaluation practice]\n\nOff by default. Tick `USE_BYOD`, choose `BYOD_MODE` (`'real'` for photographs, `'synthetic'` for renders and generated images), and either set `BYOD_PATH` to an image, folder or zip in this runtime or leave it empty for an upload dialog. Up to four images are used. A refused image stops with one message naming the file and the rule.",
-            "code": "USE_BYOD = False  # @param {{type:\"boolean\"}}\nBYOD_MODE = 'real'  # @param [\"real\", \"synthetic\"]\nBYOD_PATH = ''  # @param {{type:\"string\"}}\nif USE_BYOD:\n    if not BYOD_PATH:\n        from google.colab import files\n        upload_dir = ROOT / 'byod_upload'\n        upload_dir.mkdir(exist_ok=True)\n        for name, data in files.upload().items():\n            (upload_dir / name).write_bytes(data)\n        BYOD_PATH = str(upload_dir)\n    try:\n        run_stage('byod', '--byod-path', BYOD_PATH, '--byod-mode', BYOD_MODE)\n    except RuntimeError as failure:\n        if not any(kind + ':' in str(failure) for kind in ('ValueError', 'FileNotFoundError')):\n            raise  # a genuine failure, not a refused input\n        print('BYOD refused your input:', str(failure).split(': ', 1)[-1])\n        print('Fix the input named above, then run this cell again; the default results above are unchanged.')\n    else:\n        show_image('idol_3d_byod/previews.png', 'Your images')\nelse:\n    print('Skipped: tick USE_BYOD to run your own images.')",
+            "code": "USE_BYOD = False  # @param {{type:\"boolean\"}}\nBYOD_MODE = 'real'  # @param [\"real\", \"synthetic\"]\nBYOD_PATH = ''  # @param {{type:\"string\"}}\nif USE_BYOD:\n    if not BYOD_PATH:\n        from google.colab import files\n        upload_dir = ROOT / 'byod_upload'\n        shutil.rmtree(upload_dir, ignore_errors=True)  # a fresh upload replaces the last one\n        upload_dir.mkdir()\n        for name, data in files.upload().items():\n            (upload_dir / name).write_bytes(data)\n        BYOD_PATH = str(upload_dir)\n    try:\n        run_stage('byod', '--byod-path', BYOD_PATH, '--byod-mode', BYOD_MODE)\n    except RuntimeError as failure:\n        if not str(failure).split('): ', 1)[-1].startswith('InputRefused:'):\n            raise  # a genuine failure, not a refused input\n        print('BYOD refused your input:', str(failure).split(': ', 1)[-1])\n        print('Fix the input named above, then run this cell again; the default results above are unchanged.')\n    else:\n        show_image('idol_3d_byod/previews.png', 'Your images')\nelse:\n    print('Skipped: tick USE_BYOD to run your own images.')",
         },
     ],
     "closing": (
@@ -228,8 +244,11 @@ TEMPLATE = {
         "- **`No HF_TOKEN secret is readable`** — add the secret, switch on notebook access, rerun the Token cell, then the cells after it.\n"
         "- **`403` or `gated` while staging DINOv3** — the token's account has not been approved for DINOv3 yet; approval is manual.\n"
         "- **`has no recorded size/SHA-256`** — the DINOv3 manifest is not pinned yet; the maintainer runs `tools/pin_snapshot.py dinov3-vith16plus` and regenerates the notebook.\n"
-        "- **`needs a CUDA GPU`** — switch the runtime to a T4 GPU and Run all again.\n"
-        "- **Out of GPU memory** — restart the runtime (the environment is rebuilt quickly from the uv cache) and keep `OPTIMIZE = False`.\n\n"
+        "- **`No GPU is attached` (Section 1) or `needs a CUDA GPU`** — switch the runtime to a T4 GPU and Run all again.\n"
+        "- **A GPU is attached but `needs a CUDA GPU` still appears** — the isolated environment's torch is the CUDA 13 build; a runtime whose NVIDIA driver is older cannot run it. Start a fresh Colab runtime (Colab's current images carry a newer driver) and report the driver version (`nvidia-smi`) if it persists.\n"
+        "- **`Not enough free disk`** — start a fresh runtime; the weights (about 6.6 GB) and the environment (about 9 GB) need room.\n"
+        "- **`differs from the manifest this notebook carries`** — the weights folder came from another notebook revision: delete the folder named in the message, or start a fresh runtime.\n"
+        "- **Out of GPU memory** — restart the runtime (*Runtime → Restart session*: the isolated environment and the weights on disk are kept and reused) and keep `OPTIMIZE = False`.\n\n"
         "## References\n\n"
         "[1] Sperid Labs. 2026. Idol: a single image to a 3D Gaussian splat. Model card and SDK. https://huggingface.co/speridlabs/idol ; https://github.com/speridlabs/idol-sdk\n\n"
         "[2] Bernhard Kerbl, Georgios Kopanas, Thomas Leimkühler, and George Drettakis. 2023. 3D Gaussian Splatting for Real-Time Radiance Field Rendering. ACM Trans. Graph. 42, 4, Article 139. https://doi.org/10.1145/3592433\n\n"

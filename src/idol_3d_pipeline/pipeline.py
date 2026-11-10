@@ -79,6 +79,13 @@ class UnpinnedSnapshotError(RuntimeError):
     """A manifest carries no immutable revision, or a file without a recorded digest."""
 
 
+class InputRefused(ValueError):
+    """A user-supplied input breaks the data contract. The tutorial shows it as one message, without a traceback (DAT20)."""
+
+
+ACCEPTED_PIL_MODES = ("RGB", "RGBA", "L", "LA", "P")  # anything else is refused; L/LA/P are converted to RGB(A), and the record says so
+
+
 # ---------------------------------------------------------------------------------------------------------
 # Snapshot manifests
 # ---------------------------------------------------------------------------------------------------------
@@ -148,7 +155,8 @@ def verify_snapshot(key: str, weights_root: str | Path | None = None) -> dict[st
 def _hub_download(model_id: str, relative_path: str, revision: str, directory: Path, token: str | None) -> None:
     from huggingface_hub import hf_hub_download
 
-    hf_hub_download(model_id, relative_path, revision=revision, local_dir=str(directory), token=token)
+    # token=False sends no credential at all; None would let huggingface_hub fall back to HF_TOKEN or a cached login.
+    hf_hub_download(model_id, relative_path, revision=revision, local_dir=str(directory), token=token if token else False)
 
 
 def stage_snapshot(
@@ -209,21 +217,24 @@ def validate_request(image: Any, *, mode: str = "synthetic", steps: int = 50, nu
     if not isinstance(image, Image.Image):
         raise TypeError(f"{name}: expected a PIL.Image.Image, got {type(image).__name__}; open the file with PIL.Image.open first")
     width, height = image.size
+    if image.mode not in ACCEPTED_PIL_MODES:
+        raise InputRefused(f"{name}: image mode {image.mode} is not accepted ({', '.join(ACCEPTED_PIL_MODES)}); save it as an 8-bit RGB or RGBA PNG or JPEG")
     if min(width, height) < MIN_INPUT_SIDE:
-        raise ValueError(f"{name}: shorter side {min(width, height)} px < {MIN_INPUT_SIDE} px; supply a larger image of one object")
+        raise InputRefused(f"{name}: shorter side {min(width, height)} px < {MIN_INPUT_SIDE} px; supply a larger image of one object")
     if max(width, height) > MAX_INPUT_SIDE:
-        raise ValueError(f"{name}: longer side {max(width, height)} px > {MAX_INPUT_SIDE} px; downscale it first (the pipeline never resizes silently beyond Idol's own 1024 px step)")
+        raise InputRefused(f"{name}: longer side {max(width, height)} px > {MAX_INPUT_SIDE} px; downscale it first (the pipeline never resizes silently beyond Idol's own 1024 px step)")
     if mode not in MODES:
-        raise ValueError(f"{name}: mode {mode!r} is not one of {MODES}: 'synthetic' for renders and generated images (crop 1.2), 'real' for photographs (crop 1.7)")
+        raise InputRefused(f"{name}: mode {mode!r} is not one of {MODES}: 'synthetic' for renders and generated images (crop 1.2), 'real' for photographs (crop 1.7)")
     if not 1 <= int(steps) <= MAX_STEPS:
-        raise ValueError(f"{name}: steps {steps} outside 1..{MAX_STEPS}")
+        raise InputRefused(f"{name}: steps {steps} outside 1..{MAX_STEPS}")
     if not MIN_GAUSSIANS <= int(num_gaussians) <= MAX_GAUSSIANS or int(num_gaussians) % GAUSSIANS_PER_ANCHOR:
-        raise ValueError(f"{name}: num_gaussians {num_gaussians} must be a multiple of {GAUSSIANS_PER_ANCHOR} within {MIN_GAUSSIANS}..{MAX_GAUSSIANS}")
-    alpha = image.mode == "RGBA" and np.asarray(image.getchannel(3)).min() < 255
+        raise InputRefused(f"{name}: num_gaussians {num_gaussians} must be a multiple of {GAUSSIANS_PER_ANCHOR} within {MIN_GAUSSIANS}..{MAX_GAUSSIANS}")
+    alpha = image.mode in ("RGBA", "LA") and np.asarray(image.getchannel(image.getbands()[-1])).min() < 255
     return {
         "id": name,
         "size": [width, height],
         "mode_pil": image.mode,
+        "converted": None if image.mode in ("RGB", "RGBA") else f"{image.mode} -> {'RGBA' if 'A' in image.getbands() or image.mode == 'P' else 'RGB'} by the SDK's own conversion",
         "has_alpha": bool(alpha),
         "background_removal": "skipped: the image's own alpha is used" if alpha else "BiRefNet predicts the object mask",
         "request": {"mode": mode, "steps": int(steps), "num_gaussians": int(num_gaussians)},
