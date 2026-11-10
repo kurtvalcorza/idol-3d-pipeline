@@ -7,9 +7,13 @@ and composites front to back per pixel by exact depth sort, with colour from the
 faithful view, open the ``.ply`` in a Gaussian-splat viewer.
 
 Camera convention (Idol's ``decode_camera``): the predicted camera latent is a direction ``d`` and a distance; the
-SDK reports ``yaw = atan2(d_x, d_y)`` and ``pitch = asin(d_z)`` in the z-up object frame. The SDK does not document
-whether ``d`` points from the object to the camera or along the view, nor the image's handedness, so ``CONVENTIONS``
-enumerates the four readings and the tutorial reports the silhouette agreement of each instead of assuming one.
+SDK reports ``yaw = atan2(d_x, d_y)``, ``pitch = asin(d_z)`` in the z-up object frame, a radius and a field of view. The
+SDK documents neither the reference direction of yaw nor how its field of view maps to the 1024 px input, so the
+renderer applies a fixed **calibration** (``CALIBRATION``): field of view × 0.6 and yaw + 25°, camera on the ``d``
+side looking at the origin. It was fitted on 2026-11-10 to two splats generated in this repository's locked
+environment on CPU (backpack, ``synthetic``; porcini photograph, ``real``; 12 steps, 65,536 Gaussians), where it
+raised the input-view silhouette IoU from 0.33 and 0.40 to 0.876 and 0.872, and it is applied unchanged to every
+splat, never re-fitted per image. ``CONVENTIONS`` keeps four uncalibrated readings for diagnostics.
 """
 
 from __future__ import annotations
@@ -27,6 +31,17 @@ LOW_PASS = 0.3
 NEAR = 1e-3
 CONVENTIONS = ("toward_camera", "toward_camera_mirrored", "view_direction", "view_direction_mirrored")
 DEFAULT_CONVENTION = "toward_camera"
+CALIBRATION = {"fov_scale": 0.6, "yaw_offset_deg": 25.0, "pitch_offset_deg": 0.0, "convention": DEFAULT_CONVENTION, "fitted": "2026-11-10, two CPU-generated splats (backpack, porcini), see the module docstring"}
+
+
+def calibrated(camera: dict[str, float]) -> dict[str, float]:
+    """Idol's predicted camera, read with the fixed ``CALIBRATION`` (field of view x 0.6, yaw + 25 degrees)."""
+    return {
+        **camera,
+        "fov": float(camera["fov"]) * CALIBRATION["fov_scale"],
+        "yaw": float(camera["yaw"]) + math.radians(CALIBRATION["yaw_offset_deg"]),
+        "pitch": float(camera["pitch"]) + math.radians(CALIBRATION["pitch_offset_deg"]),
+    }
 
 
 def quaternion_to_matrix(q: np.ndarray) -> np.ndarray:

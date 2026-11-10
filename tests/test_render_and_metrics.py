@@ -8,7 +8,17 @@ import numpy as np
 import pytest
 
 from conftest import synthetic_splat, write_3dgs_ply
-from idol_3d_pipeline import CONVENTIONS, camera_pose, orbit, ply_roundtrip, render, silhouette_iou, splat_summary
+from idol_3d_pipeline import (
+    CALIBRATION,
+    CONVENTIONS,
+    calibrated,
+    camera_pose,
+    orbit,
+    ply_roundtrip,
+    render,
+    silhouette_iou,
+    splat_summary,
+)
 
 CAMERA = {"yaw": 0.0, "pitch": 0.0, "radius": 2.0, "fov": 40.0}
 
@@ -91,3 +101,12 @@ def test_ply_roundtrip_verifies_the_exported_positions(tmp_path, splat):
     moved = dict(splat)
     moved["xyz"] = splat["xyz"] + 0.01
     assert not ply_roundtrip(path, moved)["verified"]
+
+
+def test_calibration_scales_fov_and_turns_yaw_only():
+    camera = {"yaw": 1.0, "pitch": 0.2, "radius": 3.0, "fov": 40.0}
+    c = calibrated(camera)
+    assert c["fov"] == pytest.approx(40.0 * CALIBRATION["fov_scale"])
+    assert c["yaw"] == pytest.approx(1.0 + math.radians(CALIBRATION["yaw_offset_deg"]))
+    assert (c["pitch"], c["radius"]) == (0.2, 3.0)
+    assert camera["fov"] == 40.0, "the predicted camera is not modified in place"

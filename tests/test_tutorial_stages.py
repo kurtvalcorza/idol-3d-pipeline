@@ -37,22 +37,25 @@ def _fake_generation(tmp_path: Path, name: str = "ball") -> dict:
 
 def test_render_stage_checks_structure_file_and_silhouette(tmp_path):
     _fake_generation(tmp_path)
-    # the mask is the render itself from the default reading, so that reading must win with IoU 1
-    from idol_3d_pipeline import render
+    # the mask is the render itself under the fixed calibration, so the calibrated IoU must be 1
+    from idol_3d_pipeline import CALIBRATION, calibrated, render
 
     stored = np.load(tmp_path / "run" / "state" / "ball.npz")
     arrays = {k: stored[k] for k in ("xyz", "scaling", "rotation", "opacity", "rgb")}
     camera = json.loads((tmp_path / "run" / "outputs" / "ball" / "ball_camera.json").read_text())
-    alpha = render(arrays, camera, size=stages.CONVENTION_SIZE, convention="toward_camera")["alpha"]
+    alpha = render(arrays, calibrated(camera), size=stages.CONVENTION_SIZE, convention=CALIBRATION["convention"])["alpha"]
     np.savez_compressed(tmp_path / "run" / "state" / "ball.npz", mask=alpha, **arrays)
     assert _run(tmp_path, "render") == 0
     record = json.loads((tmp_path / "run" / "outputs" / "evaluation.json").read_text())
     sample = record["samples"][0]
     assert sample["structure"]["verdict"] == "well-formed"
     assert sample["ply_roundtrip"]["verified"]
-    assert sample["convention_used"] == "toward_camera" and sample["silhouette_iou"] == 1.0
-    assert (tmp_path / "run" / "outputs" / "previews.png").is_file()
+    assert sample["convention_used"] == "calibrated" and sample["silhouette_iou"] == 1.0
+    from idol_3d_pipeline import CONVENTIONS
 
+    assert set(sample["silhouette_iou_uncalibrated_diagnostic"]) == set(CONVENTIONS)
+    assert record["camera_calibration"]["fov_scale"] == 0.6
+    assert (tmp_path / "run" / "outputs" / "previews.png").is_file()
 
 def test_a_stage_run_out_of_order_fails_with_an_instruction(tmp_path):
     assert _run(tmp_path, "render") == 2

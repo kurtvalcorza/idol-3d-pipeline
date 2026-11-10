@@ -22,10 +22,11 @@ from .pipeline import (
     validate_request,
     verify_snapshot,
 )
-from .render import CONVENTIONS, camera_pose, orbit, render
+from .render import CALIBRATION, CONVENTIONS, calibrated, camera_pose, orbit, render
 from .samples import SAMPLES, fetch_samples, open_sample
 
 __all__ = [
+    "CALIBRATION",
     "CONVENTIONS",
     "DEFAULT_GAUSSIANS",
     "MODEL_ID",
@@ -39,6 +40,7 @@ __all__ = [
     "IdolSplatPipeline",
     "InputRefused",
     "UnpinnedSnapshotError",
+    "calibrated",
     "camera_pose",
     "encoder_overrides",
     "fetch_samples",

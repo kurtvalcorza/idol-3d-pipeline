@@ -275,7 +275,7 @@ def _evaluate_one(run: Run, name: str, out_dir: Path, convention: str | None = N
     import numpy as np
     from PIL import Image
 
-    from idol_3d_pipeline import CONVENTIONS, orbit, ply_roundtrip, render, silhouette_iou, splat_summary
+    from idol_3d_pipeline import CALIBRATION, CONVENTIONS, calibrated, orbit, ply_roundtrip, render, silhouette_iou, splat_summary
 
     stored = np.load(run.state / f"{name}.npz")
     arrays = {k: stored[k] for k in ("xyz", "scaling", "rotation", "opacity", "rgb")}
@@ -283,24 +283,26 @@ def _evaluate_one(run: Run, name: str, out_dir: Path, convention: str | None = N
     camera = json.loads((out_dir / f"{name}_camera.json").read_text(encoding="utf-8"))
     summary = splat_summary(arrays)
     roundtrip = ply_roundtrip(out_dir / f"{name}.ply", arrays)
-    ious = {c: round(silhouette_iou(render(arrays, camera, size=CONVENTION_SIZE, convention=c)["alpha"], mask), 4) for c in CONVENTIONS}
-    ranked = sorted(CONVENTIONS, key=lambda c: (-(ious[c] if ious[c] == ious[c] else -1.0), CONVENTIONS.index(c)))  # NaN ranks last
-    chosen = convention or ranked[0]
-    front = render(arrays, camera, size=VIEW_SIZE, convention=chosen)
-    views = [(f"turn {round(math.degrees(t))} deg", render(arrays, orbit(camera, t), size=VIEW_SIZE, convention=chosen)["image"]) for t in TURNTABLE[1:]]
+    view = calibrated(camera)  # the fixed calibration in render.py, the same for every splat
+    iou = round(silhouette_iou(render(arrays, view, size=CONVENTION_SIZE, convention=CALIBRATION["convention"])["alpha"], mask), 4)
+    raw = {c: round(silhouette_iou(render(arrays, camera, size=CONVENTION_SIZE, convention=c)["alpha"], mask), 4) for c in CONVENTIONS}
+    chosen = convention or "calibrated"
+    front = render(arrays, view, size=VIEW_SIZE, convention=CALIBRATION["convention"])
+    views = [(f"turn {round(math.degrees(t))} deg", render(arrays, orbit(view, t), size=VIEW_SIZE, convention=CALIBRATION["convention"])["image"]) for t in TURNTABLE[1:]]
     Image.fromarray(front["image"]).save(out_dir / f"{name}_render_input_view.png")
     record = {
         "id": name,
         "structure": summary,
         "ply_roundtrip": roundtrip,
-        "silhouette_iou_by_convention": ious,
+        "silhouette_iou": iou,
         "convention_used": chosen,
-        "silhouette_iou": ious[chosen],
-        "silhouette_iou_note": "the best of four camera readings, chosen by this IoU, so it is an upper bound for the reading used" if convention is None else "the reading fixed by the caller",
+        "calibration": {k: CALIBRATION[k] for k in ("fov_scale", "yaw_offset_deg", "pitch_offset_deg")},
+        "silhouette_iou_uncalibrated_diagnostic": raw,
+        "silhouette_iou_note": "under the fixed camera calibration in render.py (field of view x 0.6, yaw + 25 deg), applied unchanged to every splat; the uncalibrated readings are diagnostics only",
         "renderer": {"pairs": front["pairs"], "cut_at_max_radius": front["cut_at_max_radius"], "kind": "approximate NumPy EWA splatting (render.py), not the 3DGS rasterizer"},
     }
     model_input = Image.open(out_dir / f"{name}_input.png")
-    row = [("model input", model_input), ("object mask", (mask * 255).astype(np.uint8)), (f"render, input view (IoU {ious[chosen]:.2f})", front["image"]), *views]
+    row = [("model input", model_input), ("object mask", (mask * 255).astype(np.uint8)), (f"render, input view (IoU {iou:.2f})", front["image"]), *views]
     return record, row
 
 
@@ -312,13 +314,13 @@ def stage_render(run: Run) -> None:
         record, row = _evaluate_one(run, name, run.out / name)
         records.append(record)
         rows.append(row)
-        print({"id": name, "verdict": record["structure"]["verdict"], "gaussians": record["structure"]["gaussians"], "ply_verified": record["ply_roundtrip"]["verified"], "silhouette_iou": record["silhouette_iou"], "by_convention": record["silhouette_iou_by_convention"]})
+        print({"id": name, "verdict": record["structure"]["verdict"], "gaussians": record["structure"]["gaussians"], "ply_verified": record["ply_roundtrip"]["verified"], "silhouette_iou": record["silhouette_iou"], "uncalibrated_diagnostic": record["silhouette_iou_uncalibrated_diagnostic"]})
     panel(rows, run.out / "previews.png", tile=VIEW_SIZE)
-    conventions = {r["convention_used"] for r in records}
+    from idol_3d_pipeline import CALIBRATION
+
     payload = {
         "samples": records,
-        "conventions_chosen": sorted(conventions),
-        "consistent_convention": len(conventions) == 1,
+        "camera_calibration": CALIBRATION,
         "evidence_level": "structure and file integrity are checked; silhouette IoU covers the visible side only, through an approximate renderer; the unseen sides have no reference here",
     }
     failed = [r["id"] for r in records if r["structure"]["verdict"] != "well-formed" or not r["ply_roundtrip"]["verified"]]
@@ -326,7 +328,7 @@ def stage_render(run: Run) -> None:
     failed += [s["id"] for s in generation["samples"] if s.get("mask_replica_matches_sdk") is False]
     payload["verdict"] = "FAILED: " + ", ".join(sorted(set(failed))) if failed else "passed: every splat well-formed, every .ply read back, every mask replica equal to the SDK's input"
     run.write_output("evaluation.json", payload)
-    print({"verdict": payload["verdict"], "conventions_chosen": payload["conventions_chosen"], "consistent_convention": payload["consistent_convention"], "previews": "outputs/previews.png", "record": "outputs/evaluation.json"})
+    print({"verdict": payload["verdict"], "camera_calibration": {k: CALIBRATION[k] for k in ("fov_scale", "yaw_offset_deg")}, "previews": "outputs/previews.png", "record": "outputs/evaluation.json"})
     if failed:
         raise RuntimeError(f"checks failed for {sorted(set(failed))}; outputs/evaluation.json records which (the splats are not to be used as results)")
 

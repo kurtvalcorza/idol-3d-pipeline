@@ -27,13 +27,16 @@ DINOv3 access.
   DINOv3 encoder. The same deviation fails RUN14, §3.1, REL6 and §31(4). This caps the notebook at Candidate. Re-hosting DINOv3 (its licence permits redistribution with the
   licence text and "Built with DINOv3") would remove the deviation.
 - **NOTEBOOK_SPEC 3.1** is declared. Closed after review: the Predict → Change → Run activity (Section 7b, GDL10), a
-  use-notice cell, a "What did not work" section, and the Model Card's short sections (MODEL_CARD_SPEC G13). Open:
-  ENV14 (instantiating the paths from the lock alone) — a local CPU run of the locked environment is in progress.
+  use-notice cell, a "What did not work" section, and the Model Card's short sections (MODEL_CARD_SPEC G13). ENV14 is done: on
+  2026-11-10 the notebook's install cell built the locked environment, every snapshot verified, and Idol generated and
+  passed the checks on two samples on CPU (12 steps, 65,536 Gaussians; `docs/release-verification.md`).
 - **Samples:** two Idol SDK demo images (Apache-2.0 repository; how they were made is not stated upstream) and one
   CC0 iNaturalist photograph (porcini, observation 187524159) so the `real` mode runs on the default path.
 - **MODEL_CARD.md** is a first draft against MODEL_CARD_SPEC 1.2 and has not been reviewed.
 - **Evaluation** has no ground-truth 3D: structure, `.ply` read-back and an input-view silhouette IoU through an
-  approximate renderer. The camera convention is reported under four readings, not assumed.
+  approximate renderer. Idol's camera is read with a fixed calibration (field of view × 0.6, yaw + 25°) fitted on the
+  two CPU splats, where it scored 0.866 and 0.874; the Colab run on three samples at full settings is its first test
+  on data it was not fitted to.
 
 ## Next steps
 

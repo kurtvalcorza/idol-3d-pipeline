@@ -1,0 +1,6 @@
+{'loaded_seconds': 12.9, 'device': 'cpu'}
+{'id': 'backpack', 'gaussians': 65536, 'camera': {'yaw': 1.7494, 'pitch': 0.4183, 'radius': 4.2555, 'fov': 26.8032}, 'seconds': 599.96, 'mask_replica_matches_sdk': True, 'ply_bytes': 4456863}
+GENERATED
+{'loaded_seconds': 18.2, 'device': 'cpu'}
+{'id': 'porcini', 'gaussians': 65536, 'camera': {'yaw': 1.4284, 'pitch': 0.5044, 'radius': 2.5244, 'fov': 53.5402}, 'seconds': 660.97, 'mask_replica_matches_sdk': True, 'ply_bytes': 4456863}
+GENERATED
