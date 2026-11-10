@@ -53,15 +53,15 @@ Idol generates up to 1,048,576 3D Gaussians of one object from one image, includ
 
 ###### Groups
 
-Not assessed. The samples are two object images from the upstream SDK and one CC0 photograph of a mushroom.
+Not assessed. The three default inputs are two object images from the upstream SDK's demo (style suggests renders or generated images) and one CC0 photograph of a porcini mushroom on a forest floor. Performance on other object categories, on people, on transparent, reflective or thin structures, and on cluttered or occluded scenes has not been measured here, and the upstream card does not break its benchmark down by category. A user should expect Idol to work best on a single, complete, well-lit object similar to the renders it is demonstrated on.
 
 ###### Instrumentation
 
-Input framing depends on BiRefNet's mask and the `synthetic` (1.2×) or `real` (1.7×) crop margin.
+What Idol sees depends on the framing step before it: BiRefNet's predicted mask (or the image's own alpha channel), a 1 px erosion of that mask, and the square crop at 1.2× (`synthetic`) or 1.7× (`real`) the object's bounding box, resized to 1024 × 1024 on black. A mask that bites into the object or keeps part of the background changes the generated shape; the notebook shows each mask next to its render so this can be checked. Camera, lens and compression of a photograph are otherwise unconstrained.
 
 ###### Environment
 
-A CUDA GPU is required (documented target: Colab T4). The upstream card reports 7.2 GB peak VRAM.
+A CUDA GPU is required; the documented target is a Colab T4 (16 GB). The upstream card reports a 7.2 GB VRAM peak per request and 54.6 s per image on an L4 with compilation; this pipeline runs eagerly by default on the T4, so expect it to be slower (not yet measured). The isolated environment is CPython 3.12.12 with torch 2.14.0 (CUDA 13 build), transformers 5.22.2 and diffusers 0.42.1 from a hash lock; a runtime whose NVIDIA driver predates CUDA 13 cannot run it.
 
 #### Metrics
 
@@ -71,25 +71,25 @@ No ground-truth 3D is used here. The notebook reports per sample: structural val
 
 ###### Decision thresholds
 
-None. The silhouette IoU is reported, not thresholded.
+None for quality. The silhouette IoU is reported, not thresholded, because there is no established value that separates a good splat from a bad one for an arbitrary object. The structural checks do gate the run: non-finite values, Gaussian centres outside ±0.55, non-unit rotations, opacities outside [0, 1], a `.ply` that does not read back, or a rebuilt mask that differs from the SDK's model input stop the notebook after the record is written.
 
 ###### Approaches to uncertainty and variability
 
-One seed per sample (the upstream preset). Variation across seeds is not measured.
+Each sample runs once with its preset seed (42 or 7), so variation across seeds — which for a generative model can change the unseen sides substantially — is not measured. GPU kernels are not bitwise deterministic, so repeated runs on different hardware can differ slightly. The silhouette IoU reported is the best of four camera readings, which makes it an upper bound for the reading chosen. The optional activity varies one setting on one image and labels its result as a single observation, not an effect size.
 
 #### Ethical considerations and biases
 
 ###### Data
 
-The training data of Idol is not described in the upstream card.
+Idol's training data is not described in the upstream card, so its coverage of object categories, cultures and materials, and any overlap with the demo images used here as samples, are unknown. DINOv3 was pretrained on LVD-1689M, a large web-derived image collection (per its model name and paper). The FLUX.2 VAE's training data is not described in its card. No personal data is processed by the default path.
 
 ###### Human Life
 
-Not intended for decisions affecting people.
+Not intended for any decision that affects a person's health, safety, rights or livelihood. Generated geometry is a plausible completion, not a measurement, and must not be used where an error could cause harm (for example, fit, dosage, structural or forensic use).
 
 ###### Mitigations
 
-Digest-verified weights; no Hub-hosted code; BYOD files stay in the runtime.
+Every weight file is checked by size and SHA-256 before any model code runs, and only safetensors are loaded; no Hub-hosted code is executed (the Idol SDK is carried verbatim at a pinned commit and hash-checked). The non-commercial FLUX.2-dev VAE is replaced by a bit-for-bit-equal Apache-2.0 copy. The HF token reaches only the stages that download gated files and is never printed or stored. BYOD files stay in the runtime, and the notebook says plainly that unseen sides are generated.
 
 ###### Risks and harms
 
@@ -97,7 +97,7 @@ Generated geometry may be mistaken for measured geometry. Images of identifiable
 
 ###### Use cases
 
-See Primary Intended Uses.
+Appropriate: teaching how single-image 3D generation works and how to check it without ground truth; producing a splat of a single object for visual inspection, previews or prototyping; comparing settings (steps, Gaussian count) on the same image. Inappropriate: anything that relies on the hidden sides being correct, on metric scale, or on reconstructing a specific real person's likeness.
 
 ## Immutable provenance
 

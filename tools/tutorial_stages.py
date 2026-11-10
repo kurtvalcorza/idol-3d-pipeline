@@ -410,6 +410,35 @@ def stage_byod(run: Run) -> None:
     print({"byod_outputs": str(out_dir.relative_to(run.root)), "images": len(records)})
 
 
+def stage_activity(run: Run) -> None:
+    """Change one thing: regenerate the first sample with fewer Gaussians or fewer steps and compare with the default."""
+    from idol_3d_pipeline import SAMPLES, fetch_samples, open_sample
+
+    require_cuda("activity")
+    default = {r["id"]: r for r in json.loads((run.out / "evaluation.json").read_text(encoding="utf-8"))["samples"]}
+    generated = {s["id"]: s for s in json.loads((run.out / "generation.json").read_text(encoding="utf-8"))["samples"]}
+    sample = SAMPLES[0]
+    settings = dict(sample["preset"], steps=run.options.steps, num_gaussians=run.options.num_gaussians)
+    if (settings["steps"], settings["num_gaussians"]) == (sample["preset"]["steps"], sample["preset"]["num_gaussians"]):
+        raise ValueError("nothing changed: set ACTIVITY_STEPS or ACTIVITY_GAUSSIANS to a value other than the default (50 steps, 262,144 Gaussians)")
+    name = f"activity_{sample['id']}"
+    pipe = load_pipeline(run)
+    record = _generate_one(pipe, run, open_sample(fetch_samples(run.weights / SAMPLE_CACHE)[sample["id"]]), name, settings, run.out / name)
+    evaluated, row = _evaluate_one(run, name, run.out / name, convention=default[sample["id"]]["convention_used"])
+    base = default[sample["id"]]
+    comparison = {
+        "changed": {k: (sample["preset"][k], settings[k]) for k in ("steps", "num_gaussians") if sample["preset"][k] != settings[k]},
+        "seconds": (generated[sample["id"]]["seconds"], record["seconds"]),
+        "gaussians": (base["structure"]["gaussians"], evaluated["structure"]["gaussians"]),
+        "silhouette_iou_same_convention": (base["silhouette_iou"], evaluated["silhouette_iou"]),
+        "ply_bytes": (generated[sample["id"]]["ply_bytes"], record["ply_bytes"]),
+        "note": "pairs are (default, changed); one seed and one image, so a difference is an observation about this case, not an effect size",
+    }
+    panel([row], run.out / name / "activity.png", tile=VIEW_SIZE)
+    run.write_output(f"{name}/activity.json", comparison)
+    print(comparison)
+
+
 DEV_VAE = {"model_id": "black-forest-labs/FLUX.2-dev", "revision": "26afe3a78bb242c0a8bb181dcc8937bb16e5c66c", "path": "vae/diffusion_pytorch_model.safetensors"}
 
 
@@ -484,6 +513,7 @@ STAGES = {
     "generate": stage_generate,
     "render": stage_render,
     "byod": stage_byod,
+    "activity": stage_activity,
     "vae_check": stage_vae_check,
 }
 

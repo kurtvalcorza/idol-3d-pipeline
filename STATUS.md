@@ -26,9 +26,9 @@ DINOv3 access.
 - **RUN13 / MOD4 — deviation, by decision (Kurt, 2026-11-10):** the default path needs `HF_TOKEN` for the gated
   DINOv3 encoder. The same deviation fails RUN14, §3.1, REL6 and §31(4). This caps the notebook at Candidate. Re-hosting DINOv3 (its licence permits redistribution with the
   licence text and "Built with DINOv3") would remove the deviation.
-- **NOTEBOOK_SPEC 3.1** is declared. Open gaps found by review and not yet closed: no Predict → Change → Run
-  activity (GDL10), no separate use-notice cell, no "What did not work" section, and ENV14 (instantiating the paths
-  from the lock alone) is not done; the Model Card's short sections need expanding (MODEL_CARD_SPEC G13).
+- **NOTEBOOK_SPEC 3.1** is declared. Closed after review: the Predict → Change → Run activity (Section 7b, GDL10), a
+  use-notice cell, a "What did not work" section, and the Model Card's short sections (MODEL_CARD_SPEC G13). Open:
+  ENV14 (instantiating the paths from the lock alone) — a local CPU run of the locked environment is in progress.
 - **Samples:** two Idol SDK demo images (Apache-2.0 repository; how they were made is not stated upstream) and one
   CC0 iNaturalist photograph (porcini, observation 187524159) so the `real` mode runs on the default path.
 - **MODEL_CARD.md** is a first draft against MODEL_CARD_SPEC 1.2 and has not been reviewed.

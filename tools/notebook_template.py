@@ -141,6 +141,10 @@ TEMPLATE = {
     "guided": {
         "opening": [
             (
+                "## Use notice\n\n"
+                "Provided for research, training and evaluation purposes only. The model weights are fetched unmodified from their upstream locations under their own licences (Idol and the FLUX.2 [klein] VAE: Apache-2.0; DINOv3: the DINOv3 License — Built with DINOv3), which control your use; this notebook's code is Apache-2.0. Everything is supplied as is, without warranty, and has not been validated for production or safety-critical use. Running it downloads third-party weights and uses compute on your own account. The splats are predictions: the sides the picture does not show are generated, not measured."
+            ),
+            (
                 "## Problem statement\n\n"
                 "A single photograph of an object fixes only one side of it. Turning it into a 3D object a viewer can rotate means predicting the rest. This notebook asks what a learner can check about such a prediction "
                 "without any 3D ground truth, and shows how a licence constraint on one component (the FLUX.2-dev VAE) was met without retraining the model.\n\n"
@@ -175,7 +179,7 @@ TEMPLATE = {
                 "| 4 | [Evaluation practice] | three sample images (two synthetic, one photograph) and refusal probes |\n"
                 "| 5 | [Concept] | Idol generates a splat for each sample |\n"
                 "| 6 | [Evaluation practice] | structure, file and silhouette checks; previews |\n"
-                "| 7 | [Engineering] | the files you can take away |\n"
+                "| 7 | [Engineering] | the files you can take away; 7b optional activity: change one thing |\n"
                 "| Interpretation and conclusion | [Evaluation practice] | limits and an evidence-based conclusion |\n"
                 "| 8 | [Evaluation practice] | optional: is the klein VAE the dev VAE? (needs FLUX.2-dev access) |\n"
                 "| 9 | [Evaluation practice] | optional: Bring Your Own Data |"
@@ -223,6 +227,13 @@ TEMPLATE = {
         {
             "md": "<details>\n<summary><strong>Check your reasoning</strong></summary>\n\nHigh, but not 1.0. The previews use an approximate NumPy renderer (footprints cut at 3σ and 24 px, colour from the degree-0 harmonic only), the mask was eroded by 1 px, and Idol predicts its camera rather than being told it. One convention should score far above the others; if all four are low, either the camera reading or the splat is off, and the row says which numbers to look at. A high IoU says the visible side lines up. It says nothing about the back of the object.\n</details>\n\n## 7. Outputs [Engineering]\n\nEach sample's folder under `outputs/` holds the `.ply`, the model input, its mask, the predicted camera and the input-view render; `generation.json` records the settings, timings, digests and snapshots; `evaluation.json` records every check. Open a `.ply` in any Gaussian-splat viewer for a faithful view.",
             "code": "for path in sorted((ROOT / 'outputs').rglob('*')):\n    if path.is_file():\n        print(path.relative_to(ROOT), path.stat().st_size, 'bytes')",
+        },
+        {
+            "md": "## 7b. Optional activity: change one thing [Concept]\n\nOff by default. **Predict → Change one thing → Run → Observe → Explain.** Pick one change for the first sample (the backpack): fewer flow-matching steps (`ACTIVITY_STEPS`, e.g. 25) or fewer Gaussians (`ACTIVITY_GAUSSIANS`, e.g. 32768). Before you tick `RUN_ACTIVITY`, write down what you expect to happen to the time, the `.ply` size and the silhouette IoU. The stage regenerates the backpack with your change, scores it with the same camera reading as the default run, and prints (default, changed) pairs.",
+            "code": "RUN_ACTIVITY = False  # @param {{type:\"boolean\"}}\nACTIVITY_STEPS = 25  # @param {{type:\"integer\"}}\nACTIVITY_GAUSSIANS = 262144  # @param [\"32768\", \"65536\", \"131072\", \"262144\", \"524288\"] {{type:\"raw\"}}\nif RUN_ACTIVITY:\n    run_stage('activity', '--steps', ACTIVITY_STEPS, '--num-gaussians', ACTIVITY_GAUSSIANS)\n    show_image('activity_backpack/activity.png', 'Your change, scored the same way as the default')\nelse:\n    print('Skipped: tick RUN_ACTIVITY to try one change on the backpack.')",
+        },
+        {
+            "md": "<details>\n<summary><strong>Check your reasoning</strong></summary>\n\nFewer steps cut the denoiser's time almost proportionally (each step is two transformer passes) but leave the decoders' time unchanged; the shape usually survives and fine detail goes first, which a silhouette barely registers. Fewer Gaussians shrink the `.ply` in proportion and speed up the decoders, not the denoiser; the silhouette can stay close because each Gaussian grows to cover the same surface. If the IoU moves by a few hundredths, remember it is one image and one seed.\n</details>\n\n## What did not work\n\n- **Loading the VAE from FLUX.2-dev**, as Idol's own configuration does: its non-commercial licence rules it out for this fleet. The FLUX.2 [klein] 4B copy replaced it after a bit-for-bit comparison of all 251 tensors (in bf16, the precision Idol uses).\n- **`gsplat`, the usual Gaussian-splat rasterizer**: it has no binary wheel that a hash-locked, binary-only install can use, so the previews use the small NumPy renderer in `render.py` instead.\n- **Assuming one camera convention**: Idol's SDK does not document the direction or handedness of its predicted camera, so Section 6 scores four readings rather than guessing one.\n- **Installing the Idol SDK from GitHub**: it is not on PyPI, and a source build would need tools outside the lock, so the notebook carries the SDK's files verbatim instead.",
         },
         {
             "md": (
