@@ -1,0 +1,57 @@
+"""Idol single-image to 3D Gaussian splat pipeline for DIMER (task inference)."""
+
+from .metrics import ply_roundtrip, read_ply, silhouette_iou, splat_summary
+from .pipeline import (
+    DEFAULT_GAUSSIANS,
+    MODEL_ID,
+    MODEL_KEY,
+    MODEL_LICENSE,
+    MODEL_REVISION,
+    MODES,
+    SDK_COMMIT,
+    SNAPSHOTS,
+    IdolSplatPipeline,
+    UnpinnedSnapshotError,
+    encoder_overrides,
+    gaussian_arrays,
+    prepare_with_mask,
+    read_manifest,
+    require_pinned,
+    stage_snapshot,
+    validate_request,
+    verify_snapshot,
+)
+from .render import CONVENTIONS, camera_pose, orbit, render
+from .samples import SAMPLES, fetch_samples, open_sample
+
+__all__ = [
+    "CONVENTIONS",
+    "DEFAULT_GAUSSIANS",
+    "MODEL_ID",
+    "MODEL_KEY",
+    "MODEL_LICENSE",
+    "MODEL_REVISION",
+    "MODES",
+    "SAMPLES",
+    "SDK_COMMIT",
+    "SNAPSHOTS",
+    "IdolSplatPipeline",
+    "UnpinnedSnapshotError",
+    "camera_pose",
+    "encoder_overrides",
+    "fetch_samples",
+    "gaussian_arrays",
+    "open_sample",
+    "orbit",
+    "ply_roundtrip",
+    "prepare_with_mask",
+    "read_manifest",
+    "read_ply",
+    "render",
+    "require_pinned",
+    "silhouette_iou",
+    "splat_summary",
+    "stage_snapshot",
+    "validate_request",
+    "verify_snapshot",
+]

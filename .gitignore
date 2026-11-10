@@ -1,0 +1,15 @@
+.venv*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+outputs/
+.DS_Store
+
+# Model weights are staged locally from the Hub; only the manifests are committed
+weights/**/*.safetensors
+weights/**/*.json
+!weights/**/dimer-base-manifest.json
+weights/**/.cache/
+weights/samples/

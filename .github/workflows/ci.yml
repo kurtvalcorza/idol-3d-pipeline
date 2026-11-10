@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # torch and the model libraries are not installed: every test here runs without them (the contract, the
+      # manifests, the renderer, the stage runner's NumPy stages, and notebook parity). Model execution is evidenced
+      # only by hosted runs recorded in docs/release-verification.md.
+      - name: Install the pinned subset the tests need
+        run: python -m pip install --upgrade pip && python -m pip install numpy==2.5.4 pillow==13.0.0 plyfile==1.1.5 huggingface-hub==2.4.0 pytest==8.4.2 ruff==0.17.4
+      - name: Install package without re-resolving dependencies
+        run: python -m pip install -e . --no-deps
+      - name: Lint (the vendored src/idol is excluded; it is checked byte for byte instead)
+        run: ruff check src/idol_3d_pipeline tests tools
+      - name: Tests (offline, CPU, no torch)
+        run: pytest
+      - name: Standalone notebook parity (SRC13 / PAR3)
+        run: python tools/build_notebook.py --check
+
+  release-evidence-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain evidence boundary
+        run: |
+          echo "Static/unit CI is not clean-runtime notebook execution evidence."
+          echo "See docs/release-verification.md before promoting the tutorial beyond Candidate."

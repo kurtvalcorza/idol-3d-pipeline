@@ -1,0 +1,29 @@
+{
+  "format": "dimer_hf_snapshot",
+  "formatVersion": 1,
+  "modelKey": "dinov3-vith16plus",
+  "modelId": "facebook/dinov3-vith16plus-pretrain-lvd1689m",
+  "revision": "c807c9eeea853df70aec4069e6f56b28ddc82acc",
+  "license": "dinov3-license",
+  "files": [
+    {
+      "path": "config.json",
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "path": "model.safetensors",
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "path": "LICENSE.md",
+      "bytes": null,
+      "sha256": null
+    }
+  ],
+  "totalBytes": 0,
+  "note": "Gated (manual approval). The revision is the Hub head read anonymously on 2026-11-10; per-file sizes and digests need an account with access and are filled by `python tools/pin_snapshot.py dinov3-vith16plus` (HF_TOKEN). Until then the package refuses to stage or load DINOv3.",
+  "pinStatus": "revision-only",
+  "gated": "manual"
+}
