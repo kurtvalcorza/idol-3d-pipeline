@@ -49,11 +49,20 @@ def test_idol_and_klein_are_fully_pinned_and_only_safetensors_weights_are_listed
     assert klein["vae/diffusion_pytorch_model.safetensors"]["sha256"] == "ca70d2202afe6415bdbcb8793ba8cd99fd159cfe6192381504d6c4d3036e0f04"
 
 
-def test_dinov3_is_refused_until_its_digests_are_recorded():
-    manifest = read_manifest("dinov3-vith16plus", WEIGHTS)
+def test_all_three_snapshots_are_pinned_and_dinov3_is_the_recorded_file():
+    for key in SNAPSHOTS:
+        require_pinned(key, read_manifest(key, WEIGHTS))
+    dino = {e["path"]: e for e in read_manifest("dinov3-vith16plus", WEIGHTS)["files"]}
+    assert dino["model.safetensors"]["bytes"] == 3_362_432_800
+    assert dino["model.safetensors"]["sha256"] == "3e1d4d18b9bfa9f28fad8e9de6a783f1313532d3460efa4cd0b12521d81d1a4d"
+    assert "pinStatus" not in read_manifest("dinov3-vith16plus", WEIGHTS)
+
+
+def test_an_unpinned_manifest_is_refused_with_the_pin_command():
+    manifest = dict(read_manifest("dinov3-vith16plus", WEIGHTS))
+    manifest["files"] = [dict(e, sha256=None) for e in manifest["files"]]
     with pytest.raises(UnpinnedSnapshotError, match="pin_snapshot.py dinov3-vith16plus"):
         require_pinned("dinov3-vith16plus", manifest)
-
 
 def test_no_snapshot_is_the_non_commercial_flux2_dev_origin():
     assert NON_COMMERCIAL_ORIGIN not in {spec["model_id"] for spec in SNAPSHOTS.values()}

@@ -18,7 +18,7 @@ date_published_source: "Creation time of the Hugging Face repository speridlabs/
 > ⚠️ **Provided for research, training, and evaluation purposes only.** Model weights are fetched unmodified from their upstream locations under their own licences, which control your use; the accompanying code and notebooks are released under this repository's licence. All of it is supplied **"as is"**, without warranty of any kind, and has not been validated for production or safety-critical use. Running the notebook downloads third-party weights governed by their own licences and consumes compute on your own Colab account. Hosting implies no affiliation with or endorsement by the original authors.
 
 > [!IMPORTANT]
-> **Draft card, Candidate pipeline.** No result in this card was produced by running the model in this repository yet. The DINOv3 snapshot is pinned by commit only; its per-file digests are pending (see `STATUS.md`).
+> **Draft card, Candidate pipeline.** No result in this card was produced by running the model in this repository yet. All three snapshots are pinned by commit and per-file SHA-256.
 
 ---
 
@@ -105,7 +105,7 @@ See Primary Intended Uses.
 |---|---|---|---|---|
 | Idol | `speridlabs/idol` | `2731c2291fc65a797c5cb627a5e5526fc1490902` | Apache-2.0 | 4 safetensors (3,078,979,896 bytes) + `config.json` |
 | FLUX.2 VAE | `black-forest-labs/FLUX.2-klein-4B` (`vae/` only) | `e7b7dc27f91deacad38e78976d1f2b499d76a294` | Apache-2.0 | `vae/diffusion_pytorch_model.safetensors` (168,120,878 bytes, SHA-256 `ca70d220…0f04`), `vae/config.json` |
-| DINOv3 ViT-H+/16 | `facebook/dinov3-vith16plus-pretrain-lvd1689m` (gated) | `c807c9eeea853df70aec4069e6f56b28ddc82acc` | DINOv3 License | digests pending |
+| DINOv3 ViT-H+/16 | `facebook/dinov3-vith16plus-pretrain-lvd1689m` (gated) | `c807c9eeea853df70aec4069e6f56b28ddc82acc` | DINOv3 License | `model.safetensors` (3,362,432,800 bytes, SHA-256 `3e1d4d18…1a4d`), `config.json`, `LICENSE.md` |
 | Idol SDK | `speridlabs/idol-sdk` (carried in `src/idol`) | `8db700349a5570aac390e4780fa32e3eed6b587a` | Apache-2.0 | 13 files, SHA-256 in `docs/upstream-sdk.json` |
 
 Built with DINOv3.

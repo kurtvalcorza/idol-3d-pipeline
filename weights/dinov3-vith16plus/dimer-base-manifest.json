@@ -12,22 +12,23 @@
   "files": [
     {
       "path": "config.json",
-      "bytes": null,
-      "sha256": null
+      "bytes": 744,
+      "sha256": "35770e98e425c9383534bcbfa7f3b7a3cb1d943f6d26a37d7d19fea0735eab57",
+      "gitBlobSha1": "136174e19cf92f5af441d1b42b4534a81e831b97"
     },
     {
       "path": "model.safetensors",
-      "bytes": null,
-      "sha256": null
+      "bytes": 3362432800,
+      "sha256": "3e1d4d18b9bfa9f28fad8e9de6a783f1313532d3460efa4cd0b12521d81d1a4d"
     },
     {
       "path": "LICENSE.md",
-      "bytes": null,
-      "sha256": null
+      "bytes": 7503,
+      "sha256": "25d122eb8f5b880fd23c736fb6ea8018ee45c12237e00b8a86d14c653904999e",
+      "gitBlobSha1": "f531b1e6b5ab2318957bbf8ad1bda9f800a23e17"
     }
   ],
-  "totalBytes": 0,
+  "totalBytes": 3362441047,
   "note": "Gated (manual approval). The revision is the Hub head read anonymously on 2026-11-10; per-file sizes and digests need an account with access and are filled by `python tools/pin_snapshot.py dinov3-vith16plus` (HF_TOKEN). Until then the package refuses to stage or load DINOv3.",
-  "pinStatus": "revision-only",
   "gated": "manual"
 }

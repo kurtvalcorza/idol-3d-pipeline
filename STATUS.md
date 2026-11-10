@@ -14,24 +14,12 @@ the klein VAE (record in `docs/release-verification.md`). Idol loads the VAE in 
 identical on this route. The notebook's optional `vae_check` stage repeats this with torch and adds Idol's own
 conditioning on a GPU.
 
-## Blocking the first hosted run
+## Pins: complete
 
-1. **DINOv3 digests are not recorded.** `weights/dinov3-vith16plus/dimer-base-manifest.json` pins the commit
-   (`c807c9e`) but not the file sizes and SHA-256, because the Hub hides them without access. Until they are recorded
-   the notebook stops at Section 3, before any download.
-
-   A Hugging Face token for account `kurtvalcorza` is saved on the cloud environment (huggingface.co network secret),
-   and FLUX.2-dev access works. The DINOv3 access request is **awaiting review by Meta** (Hub message, 2026-11-10);
-   approval is manual.
-
-   Once access works, the maintainer session runs (no download of the weights; the Hub's LFS record gives their size
-   and SHA-256):
-
-   ```bash
-   HF_TOKEN=proxy-injected python tools/pin_snapshot.py dinov3-vith16plus && python tools/build_notebook.py && pytest
-   ```
-
-   The same token in Colab (`HF_TOKEN` secret) is what the notebook's `weights` stage uses.
+DINOv3 access was granted on 2026-11-10 and its manifest is pinned (`model.safetensors` 3,362,432,800 bytes, SHA-256
+`3e1d4d18…1a4d`; `config.json`; `LICENSE.md`), recorded by `tools/pin_snapshot.py` from the Hub's records at
+`c807c9e`. Nothing blocks a hosted run any more; it needs a Colab T4 and an `HF_TOKEN` secret of an account with
+DINOv3 access.
 
 ## Conformance boundary
 
@@ -49,10 +37,9 @@ conditioning on a GPU.
 
 ## Next steps
 
-1. Record the DINOv3 digests (above).
-2. Colab T4 `Run all`; record the executed copy under `docs/execution-evidence/` and the run in
+1. Colab T4 `Run all`; record the executed copy under `docs/execution-evidence/` and the run in
    `docs/release-verification.md`.
-3. Optionally run Section 8 (`vae_check`, needs FLUX.2-dev access) and record the verdict in the ml-worker matrix row.
-4. REL12 BYOD journey on a hosted runtime.
+2. Optionally run Section 8 (`vae_check`, needs FLUX.2-dev access) and record the verdict in the ml-worker matrix row.
+3. REL12 BYOD journey on a hosted runtime.
 
 Design and the calls made while building: `docs/superpowers/specs/2026-11-10-idol-3d-pipeline-design.md`.
