@@ -26,7 +26,7 @@ date_published_source: "Creation time of the Hugging Face repository speridlabs/
 
 - **Task-inference Guided Notebook**:
   [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kurtvalcorza/idol-3d-pipeline/blob/main/tutorials/idol_3d_colab.ipynb) [`idol_3d_colab.ipynb`](tutorials/idol_3d_colab.ipynb)
-  *Two pinned sample images from the Idol SDK turned into 3D Gaussian splats on a T4, with structural, `.ply` read-back and input-view silhouette checks, rendered previews, an optional klein-vs-dev VAE equivalence check, and Bring Your Own Data. Needs an `HF_TOKEN` secret for the gated DINOv3 encoder.*
+  *Three pinned sample images (two Idol SDK demo images, one CC0 photograph) turned into 3D Gaussian splats on a T4, with structural, `.ply` read-back and input-view silhouette checks, rendered previews, an optional klein-vs-dev VAE equivalence check, and Bring Your Own Data. Needs an `HF_TOKEN` secret for the gated DINOv3 encoder.*
 
 #### Description
 
@@ -53,7 +53,7 @@ Idol generates up to 1,048,576 3D Gaussians of one object from one image, includ
 
 ###### Groups
 
-Not assessed. The samples are two object images from the upstream SDK.
+Not assessed. The samples are two object images from the upstream SDK and one CC0 photograph of a mushroom.
 
 ###### Instrumentation
 

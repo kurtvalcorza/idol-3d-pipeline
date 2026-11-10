@@ -76,9 +76,10 @@ def test_mask_replica_reproduces_the_sdk_composite_exactly(margin):
 
 
 def test_samples_are_pinned_to_the_sdk_commit_and_verified(tmp_path):
-    assert {s["id"] for s in SAMPLES} == {"backpack", "armchair"}
+    assert {s["id"]: s["preset"]["mode"] for s in SAMPLES} == {"backpack": "synthetic", "armchair": "synthetic", "porcini": "real"}
     for sample in SAMPLES:
-        assert sample_url(sample).startswith(f"https://raw.githubusercontent.com/speridlabs/idol-sdk/{SDK_COMMIT}/demo/examples/")
+        assert sample_url(sample).startswith((f"https://raw.githubusercontent.com/speridlabs/idol-sdk/{SDK_COMMIT}/demo/examples/", "https://inaturalist-open-data.s3.amazonaws.com/photos/"))
+        assert sample["license"]
         assert len(sample["sha256"]) == 64 and sample["preset"]["num_gaussians"] % 32 == 0
         with pytest.raises(ValueError, match="refusing to decode"):
             verify_bytes(sample, b"not the image")

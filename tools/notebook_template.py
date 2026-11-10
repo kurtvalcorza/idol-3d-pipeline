@@ -74,12 +74,12 @@ TEMPLATE = {
     "kind": "TUTORIAL",
     "require_gpu": "Idol's generation stage needs a CUDA GPU (on a CPU it would take an estimated tens of minutes per image), so this notebook stops here rather than after building the environment and downloading about 6.6 GB.",
     "carried_extra": ", the Idol SDK carried verbatim (13 modules under `src/idol/`, upstream commit `8db7003`)",
-    "external_extra": "the `black-forest-labs/FLUX.2-klein-4B` VAE (`vae/` only, 168 MB) and the gated `facebook/dinov3-vith16plus-pretrain-lvd1689m` encoder (an estimated 3.4 GB: 840.6 M parameters, if stored in fp32; the exact size is recorded once it is pinned) at the revisions in their manifests, with the token below; `raw.githubusercontent.com` for the two sample images; ",
+    "external_extra": "the `black-forest-labs/FLUX.2-klein-4B` VAE (`vae/` only, 168 MB) and the gated `facebook/dinov3-vith16plus-pretrain-lvd1689m` encoder (an estimated 3.4 GB: 840.6 M parameters, if stored in fp32; the exact size is recorded once it is pinned) at the revisions in their manifests, with the token below; `raw.githubusercontent.com` and `inaturalist-open-data.s3.amazonaws.com` for the three sample images; ",
     "run_all": (
         "Selecting **Run all** in a fresh Linux runtime with a CUDA GPU (a Colab T4 is the documented target) and an `HF_TOKEN` secret (see **Credential** in the Prerequisites) builds an isolated Python "
         "environment from the carried hash-locked requirements (torch, transformers, diffusers, tensordict and their dependencies) without touching the notebook kernel's own packages, then runs each "
-        "stage below in its own process: it stages and digest-verifies three pinned snapshots (Idol's 3.08 GB of weights, the 0.17 GB FLUX.2 [klein] VAE and the DINOv3 ViT-H+/16 encoder, an estimated 3.4 GB; about 6.6 GB in all), fetches two "
-        "pinned sample images from the Idol SDK, validates them, turns each into a 3D Gaussian splat of 262,144 Gaussians written as a standard 3DGS `.ply`, and checks and previews every splat. "
+        "stage below in its own process: it stages and digest-verifies three pinned snapshots (Idol's 3.08 GB of weights, the 0.17 GB FLUX.2 [klein] VAE and the DINOv3 ViT-H+/16 encoder, an estimated 3.4 GB; about 6.6 GB in all), fetches three "
+        "pinned sample images (two from the Idol SDK, one CC0 photograph), validates them, turns each into a 3D Gaussian splat of 262,144 Gaussians written as a standard 3DGS `.ply`, and checks and previews every splat. "
         "The default path needs no repository clone, no DIMER worker or service, no upload dialog, no configuration edit and no runtime restart; it does need the token above. No hosted run of this "
         "notebook has been recorded yet (see `docs/release-verification.md`)."
     ),
@@ -130,13 +130,13 @@ TEMPLATE = {
     "prerequisites": [
         "- **Runtime:** a fresh **Linux x86_64** runtime with a **CUDA GPU**; a Colab T4 (16 GB) is the documented target. Idol's card gives a 7.2 GB VRAM peak per request. The generation stage refuses a CPU-only runtime with a message (tens of minutes per image otherwise). The kernel's own Python version does not matter: the notebook installs nothing into it and runs every stage with CPython 3.12.12 in an isolated environment built from {n_locked} hash-locked packages. The Section 1 check asks for about 9 GB of free disk for that environment and 5.5 GB for the weights and samples.",
         "- **Time:** not yet measured for this notebook; the figures here are estimates. Idol's card reports 54.6 s per image on an L4 with compilation on; this notebook runs eagerly by default (`OPTIMIZE = False` in Section 5), which is slower but avoids a compile step on the T4. Downloading about 6.6 GB of weights takes several minutes.",
-        "- **Precision, seeds and variation:** DINOv3 and the FLUX.2 VAE run in bf16, BiRefNet in fp16 on CUDA, the denoiser and decoders as the SDK sets them (fp16 transformer blocks with fp32 embeddings and norms). Each sample uses its upstream preset seed (42 for the backpack, 7 for the armchair); BYOD uses seed 42. GPU kernels are not bitwise deterministic, so splats and the scores in Section 6 can differ slightly between runs and GPUs.",
+        "- **Precision, seeds and variation:** DINOv3 and the FLUX.2 VAE run in bf16, BiRefNet in fp16 on CUDA, the denoiser and decoders as the SDK sets them (fp16 transformer blocks with fp32 embeddings and norms). Each sample uses its preset seed (42 for the backpack, 7 for the armchair, 42 for the porcini photograph); BYOD uses seed 42. GPU kernels are not bitwise deterministic, so splats and the scores in Section 6 can differ slightly between runs and GPUs.",
         "- **Knowledge:** you can run notebook cells and read short Python. No prior experience with 3D reconstruction is assumed; the glossary defines the terms.",
         "- **Weights:** only `.safetensors` files are loaded, each checked by size and SHA-256 against the carried manifests before any model code runs. The Idol SDK is carried verbatim at commit `8db7003` (Apache-2.0) and verified like every carried file; no Hub-hosted code is executed. Idol's weights and the klein VAE are Apache-2.0; DINOv3 is under the DINOv3 License.",
         "- **Pin status:** Idol and the klein VAE are pinned by commit and per-file SHA-256. DINOv3 is pinned by commit; its per-file digests are recorded by `tools/pin_snapshot.py` with access to the gated repository. If the carried DINOv3 manifest still lists a file without a digest, Section 3 stops with that message instead of loading unverified weights.",
         "- **Data contract:** one RGB or RGBA image of one object, 64..4096 px per side. Without a real alpha channel BiRefNet predicts the object mask. Output: a 3DGS `.ply` (z-up object turned y-up for viewers), the 1024 × 1024 image Idol saw, its object mask, and the predicted camera (yaw, pitch, radius, field of view).",
         "- **Privacy:** Do not upload confidential or restricted data to a hosted runtime unless you are authorized to process it there. The default path uploads nothing, and BYOD files stay in this runtime.",
-        "- **External access (samples):** two pinned images (70 KB) from `raw.githubusercontent.com/speridlabs/idol-sdk` at commit `8db7003`, digest-verified before decoding. They ship in that Apache-2.0 repository; the SDK does not state how they were made.",
+        "- **External access (samples):** two pinned images (70 KB) from `raw.githubusercontent.com/speridlabs/idol-sdk` at commit `8db7003` (an Apache-2.0 repository; the SDK does not state how they were made) and one CC0 photograph (379 KB) from the public iNaturalist open-data bucket `inaturalist-open-data.s3.amazonaws.com`, each digest-verified before decoding.",
     ],
     "guided": {
         "opening": [
@@ -145,10 +145,11 @@ TEMPLATE = {
                 "A single photograph of an object fixes only one side of it. Turning it into a 3D object a viewer can rotate means predicting the rest. This notebook asks what a learner can check about such a prediction "
                 "without any 3D ground truth, and shows how a licence constraint on one component (the FLUX.2-dev VAE) was met without retraining the model.\n\n"
                 "## Data context\n\n"
-                "The two default inputs are example images from the Idol SDK's own demo (`demo/examples/` in [speridlabs/idol-sdk](https://github.com/speridlabs/idol-sdk/tree/8db700349a5570aac390e4780fa32e3eed6b587a/demo/examples) "
+                "Three default inputs. Two are example images from the Idol SDK's own demo (`demo/examples/` in [speridlabs/idol-sdk](https://github.com/speridlabs/idol-sdk/tree/8db700349a5570aac390e4780fa32e3eed6b587a/demo/examples) "
                 "at commit `8db7003`, Apache-2.0), run with the settings in its `presets.json`. The SDK does not say how they were made; their style suggests renders or generated images, the `synthetic` "
-                "input kind Idol's default mode is for. Idol's training data is not described upstream, so these images may resemble, or come from the same source as, what the model was trained on: treat "
-                "every result here as tutorial evidence about these two images, not as an estimate of how Idol does on new objects. Your own photographs go through Section 9 in `real` mode."
+                "input kind Idol's default mode is for. The third is a CC0 photograph of one porcini mushroom from iNaturalist (observation [187524159](https://www.inaturalist.org/observations/187524159), photo 327959642, by moorebuesing), "
+                "run in `real` mode, so both crop settings and a natural background are on the default path. Idol's training data is not described upstream, so the demo images may resemble, or come from the same source as, what the model was trained on: treat "
+                "every result here as tutorial evidence about these three images, not as an estimate of how Idol does on new objects. Your own photographs go through Section 9 in `real` mode."
             ),
             (
                 "## How to use this notebook\n\n"
@@ -171,7 +172,7 @@ TEMPLATE = {
                 "| Section | Tag | What happens |\n"
                 "|---|---|---|\n"
                 "| 1–3 | [Engineering] | runtime check; carried code, token and isolated environment; three snapshots staged and verified |\n"
-                "| 4 | [Evaluation practice] | two sample images and refusal probes |\n"
+                "| 4 | [Evaluation practice] | three sample images (two synthetic, one photograph) and refusal probes |\n"
                 "| 5 | [Concept] | Idol generates a splat for each sample |\n"
                 "| 6 | [Evaluation practice] | structure, file and silhouette checks; previews |\n"
                 "| 7 | [Engineering] | the files you can take away |\n"
@@ -208,11 +209,11 @@ TEMPLATE = {
     ],
     "cells": [
         {
-            "md": "## 4. Sample inputs and validation [Evaluation practice]\n\nTwo example images ship with the Idol SDK, each with the settings its own demo uses. The stage fetches them by commit, checks their digests, validates each request, and then shows that three invalid requests are refused with a message before any model runs.\n\n**Predict before running.** Both samples are 768 × 768 RGB with no alpha channel. Which network will produce their object masks?",
-            "code": "run_stage('prepare')\nshow_image('inputs.png', 'Sample inputs (from the Idol SDK at commit 8db7003)')",
+            "md": "## 4. Sample inputs and validation [Evaluation practice]\n\nTwo example images ship with the Idol SDK, each with the settings its own demo uses (`synthetic` mode); the third is a CC0 photograph of a porcini mushroom on a forest floor (`real` mode). The stage fetches them by pinned URL, checks their digests, validates each request, and then shows that three invalid requests are refused with a message before any model runs.\n\n**Predict before running.** None of the three has an alpha channel. Which network will produce their object masks, and which of the three do you expect it to find hardest to cut out?",
+            "code": "run_stage('prepare')\nshow_image('inputs.png', 'Sample inputs: two Idol SDK demo images and one CC0 iNaturalist photograph')",
         },
         {
-            "md": "<details>\n<summary><strong>Check your reasoning</strong></summary>\n\nBiRefNet: an image with no real alpha channel gets a predicted mask (`background_removal` says so). An RGBA image with transparent pixels would skip it and use its own alpha. The refusal probes show the contract is enforced before the GPU is touched.\n</details>\n\n## 5. Generate the splats [Concept]\n\nIdol is loaded from the verified snapshots with both encoders replaced, then each sample runs with its upstream preset: 50 flow-matching steps, guidance 3.0, 262,144 Gaussians. `OPTIMIZE` turns on `torch.compile` and batched guidance: faster after a slow first image, but the compile step is the riskiest part on a T4, so it is off by default.\n\n**Predict before running.** Idol's card quotes 7.2 GB of VRAM and under a minute per image on an L4. Will a T4 running eagerly be faster or slower, and by roughly how much?",
+            "md": "<details>\n<summary><strong>Check your reasoning</strong></summary>\n\nBiRefNet: an image with no real alpha channel gets a predicted mask (`background_removal` says so). An RGBA image with transparent pixels would skip it and use its own alpha. The photograph is the hardest case: moss, needles and leaves around the stem are the kind of clutter a mask can include or bite into, which Section 6's mask column lets you check. The refusal probes show the contract is enforced before the GPU is touched.\n</details>\n\n## 5. Generate the splats [Concept]\n\nIdol is loaded from the verified snapshots with both encoders replaced, then each sample runs with its upstream preset: 50 flow-matching steps, guidance 3.0, 262,144 Gaussians. `OPTIMIZE` turns on `torch.compile` and batched guidance: faster after a slow first image, but the compile step is the riskiest part on a T4, so it is off by default.\n\n**Predict before running.** Idol's card quotes 7.2 GB of VRAM and under a minute per image on an L4. Will a T4 running eagerly be faster or slower, and by roughly how much?",
             "code": "OPTIMIZE = False  # @param {{type:\"boolean\"}}\nrun_stage('generate', *(['--optimize'] if OPTIMIZE else []))\ngeneration = load_record('generation.json')\nfor sample in generation['samples']:\n    print({{k: sample[k] for k in ('id', 'gaussians', 'seconds', 'camera', 'mask_replica_matches_sdk', 'ply_bytes')}})",
         },
         {
@@ -227,7 +228,7 @@ TEMPLATE = {
             "md": (
                 "## Interpretation and conclusion [Evaluation practice]\n\n"
                 "**What this run shows.** Idol ran from digest-verified local snapshots: DINOv3 is the same gated model Idol names, and the VAE is the Apache-2.0 FLUX.2 [klein] copy in place of FLUX.2-dev. It produced well-formed splats whose `.ply` files read back with the same count, fields and positions. The silhouette IoU says how well the visible side lines up with the input, through an approximate renderer [6].\n\n"
-                "**What it does not show.** That the unseen sides are right: there is no reference for them here. That the klein VAE equals the dev VAE: Section 8 tests that and needs FLUX.2-dev access. That two images represent anything beyond themselves: they come from the model's own demo and may resemble its undisclosed training data, so this is tutorial evidence, not a performance estimate.\n\n"
+                "**What it does not show.** That the unseen sides are right: there is no reference for them here. That the klein VAE equals the dev VAE: Section 8 tests that and needs FLUX.2-dev access. That three images represent anything beyond themselves: two come from the model's own demo and may resemble its undisclosed training data, so this is tutorial evidence, not a performance estimate.\n\n"
                 "**Write your conclusion** in three sentences: what was generated, which checks passed with which numbers, and the one limit you consider most important.\n\n"
                 "## 8. Optional: is the klein VAE the FLUX.2-dev VAE? [Evaluation practice]\n\n"
                 "Off by default. With `RUN_VAE_CHECK` ticked and an `HF_TOKEN` whose account has accepted the FLUX.2-dev terms, the `vae_check` stage downloads the dev VAE (336 MB) for this check only, compares every tensor cast to bf16 with the klein VAE bit for bit, and runs Idol's own VAE encoding with each on the same image beside a dev-vs-dev rerun that measures this GPU's noise floor. FLUX.2-dev is never used for generation."

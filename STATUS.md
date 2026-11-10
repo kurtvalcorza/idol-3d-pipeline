@@ -1,40 +1,43 @@
 # Status — Candidate (not yet run on a hosted runtime)
 
-**2026-11-10.** Built on branch `ccr-deb2a494-n7dsf1`. CI-level checks pass locally (ruff; 42 tests without torch;
-notebook parity). The notebook's runtime-check and carrier cells and its carried `prepare` stage were executed locally
-from the generated notebook (25 carried files verified; both samples fetched and digest-checked; three refusal probes
-refused). **No model has run yet:** torch and the model stages have never executed in this repository.
+**2026-11-10.** Built on branch `ccr-deb2a494-n7dsf1`, reviewed twice (a torch-path review and a NOTEBOOK_SPEC 3.1
+review; their findings are fixed in `791b564` and after). CI-level checks pass locally (ruff; 46 tests without torch;
+notebook parity). From the generated notebook, the runtime-check and carrier cells and the carried `prepare` and
+`weights` stages were run locally: 25 carried files verified; all three samples fetched and digest-checked; the
+refusal probes refused; the `weights` stage installed the carried manifests and stopped on the unpinned DINOv3
+before downloading anything. **No model has run yet:** torch and the model stages have never executed here.
 
 ## Blocking the first hosted run
 
 1. **DINOv3 digests are not recorded.** `weights/dinov3-vith16plus/dimer-base-manifest.json` pins the commit
    (`c807c9e`) but not the file sizes and SHA-256, because the Hub hides them without access. Until they are recorded
-   the notebook stops at Section 3 with that message. Either run, with an `HF_TOKEN` whose account has DINOv3 access:
+   the notebook stops at Section 3, before any download.
+
+   A Hugging Face token for account `kurtvalcorza` is saved on the cloud environment (huggingface.co network secret),
+   but on 2026-11-10 the Hub answered `403 GatedRepo: you are not in the authorized list` for **both**
+   `facebook/dinov3-vith16plus-pretrain-lvd1689m` and `black-forest-labs/FLUX.2-dev`. One of two things is missing:
+   - the account's access: request it on the DINOv3 page (manual approval) and accept the FLUX.2-dev terms; or
+   - the token's scope: a fine-grained token needs *Read access to contents of all public gated repos you can access*.
+
+   Once access works, the maintainer session runs (no download of the weights; the Hub's LFS record gives their size
+   and SHA-256):
 
    ```bash
-   python tools/pin_snapshot.py dinov3-vith16plus && python tools/build_notebook.py && pytest
+   HF_TOKEN=proxy-injected python tools/pin_snapshot.py dinov3-vith16plus && python tools/build_notebook.py && pytest
    ```
 
-   or paste the output of this cell (run in any Colab with the `HF_TOKEN` secret) back to the maintainer session:
-
-   ```python
-   from google.colab import userdata
-   from huggingface_hub import HfApi
-   api = HfApi(token=userdata.get('HF_TOKEN'))
-   for i in api.get_paths_info('facebook/dinov3-vith16plus-pretrain-lvd1689m', ['config.json', 'model.safetensors', 'LICENSE.md'],
-                               revision='c807c9eeea853df70aec4069e6f56b28ddc82acc', expand=True):
-       print(i.path, i.size, i.blob_id, i.lfs.sha256 if i.lfs else None)
-   ```
-
-   (Small files need their SHA-256 computed from the bytes; the pin tool does that and checks the git blob id.)
+   The same token in Colab (`HF_TOKEN` secret) is what the notebook's `weights` stage uses.
 
 ## Conformance boundary
 
 - **RUN13 / MOD4 — deviation, by decision (Kurt, 2026-11-10):** the default path needs `HF_TOKEN` for the gated
-  DINOv3 encoder. This caps the notebook at Candidate. Re-hosting DINOv3 (its licence permits redistribution with the
+  DINOv3 encoder. The same deviation fails RUN14, §3.1, REL6 and §31(4). This caps the notebook at Candidate. Re-hosting DINOv3 (its licence permits redistribution with the
   licence text and "Built with DINOv3") would remove the deviation.
-- **NOTEBOOK_SPEC 3.1** is declared; the guided layer is partial (no Predict → Change → Run activity yet, no
-  separate use notice cell), and the write-up layer (DOC1–DOC21) has not been reviewed against this notebook.
+- **NOTEBOOK_SPEC 3.1** is declared. Open gaps found by review and not yet closed: no Predict → Change → Run
+  activity (GDL10), no separate use-notice cell, no "What did not work" section, and ENV14 (instantiating the paths
+  from the lock alone) is not done; the Model Card's short sections need expanding (MODEL_CARD_SPEC G13).
+- **Samples:** two Idol SDK demo images (Apache-2.0 repository; how they were made is not stated upstream) and one
+  CC0 iNaturalist photograph (porcini, observation 187524159) so the `real` mode runs on the default path.
 - **MODEL_CARD.md** is a first draft against MODEL_CARD_SPEC 1.2 and has not been reviewed.
 - **Evaluation** has no ground-truth 3D: structure, `.ply` read-back and an input-view silhouette IoU through an
   approximate renderer. The camera convention is reported under four readings, not assumed.

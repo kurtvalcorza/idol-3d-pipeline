@@ -200,7 +200,7 @@ def stage_prepare(run: Run) -> None:
         image = open_sample(data[sample["id"]])
         preset = sample["preset"]
         record = validate_request(image, mode=preset["mode"], steps=preset["steps"], num_gaussians=preset["num_gaussians"], name=sample["id"])
-        record.update({"source": sample["path"], "sha256": sample["sha256"], "preset": preset})
+        record.update({"source": sample.get("url") or sample["path"], "license": sample["license"], "sha256": sample["sha256"], "preset": preset})
         records.append(record)
         cells.append((f"{sample['id']} ({image.size[0]}x{image.size[1]})", image))
         print({k: record[k] for k in ("id", "size", "mode_pil", "has_alpha", "background_removal", "request", "verdict")})
