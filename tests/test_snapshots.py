@@ -165,3 +165,29 @@ def test_git_blob_sha1_matches_the_hub_oid_recorded_for_idol_config():
     assert git_blob_sha1(b"") == "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
     assert len(entry["gitBlobSha1"]) == 40
     assert shutil.which  # keeps the import used on minimal runners
+
+
+class _FakeApi:
+    def __init__(self, whoami_error=None, auth_error=None):
+        self.whoami_error, self.auth_error = whoami_error, auth_error
+
+    def whoami(self, token=None):
+        if self.whoami_error:
+            raise self.whoami_error
+        return {"name": "someone"}
+
+    def auth_check(self, repo_id, token=None):
+        if self.auth_error:
+            raise self.auth_error
+
+
+def test_gated_access_check_names_the_real_problem():
+    from idol_3d_pipeline.pipeline import check_gated_access
+
+    assert check_gated_access("dinov3-vith16plus", "hf_x", api=_FakeApi())["account"] == "someone"
+    with pytest.raises(PermissionError, match="does not recognise this HF_TOKEN"):
+        check_gated_access("dinov3-vith16plus", "hf_x", api=_FakeApi(whoami_error=RuntimeError("401")))
+    with pytest.raises(PermissionError, match="account 'someone', which cannot read"):
+        check_gated_access("dinov3-vith16plus", "hf_x", api=_FakeApi(auth_error=RuntimeError("403")))
+    with pytest.raises(PermissionError, match="is gated"):
+        check_gated_access("dinov3-vith16plus", None, api=_FakeApi())

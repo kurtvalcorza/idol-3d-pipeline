@@ -187,6 +187,33 @@ def stage_snapshot(
     return missing
 
 
+def check_gated_access(key: str, token: str | None, *, api: Any = None) -> dict[str, Any]:
+    """Before any download, ask the Hub who the token belongs to and whether that account may read the gated snapshot.
+
+    Turns the Hub's two refusals into one actionable message: an unknown or revoked token (the Hub answers as if no one
+    were logged in, HTTP 401) versus a valid token whose account has no access yet (HTTP 403)."""
+    spec = SNAPSHOTS[key]
+    if not token:
+        raise PermissionError(f"{key} ({spec['model_id']}) is gated: set HF_TOKEN to a token of an account that has accepted its terms at https://huggingface.co/{spec['model_id']}")
+    if api is None:
+        from huggingface_hub import HfApi
+
+        api = HfApi()
+    try:
+        account = api.whoami(token=token).get("name")
+    except Exception as error:
+        raise PermissionError(
+            f"the Hugging Face Hub does not recognise this HF_TOKEN ({type(error).__name__}): it is mistyped, revoked or expired. Create a new token at https://huggingface.co/settings/tokens (Read, or fine-grained with 'Read access to contents of all public gated repos you can access'), put it in the HF_TOKEN secret, and run the Token cell again."
+        ) from None
+    try:
+        api.auth_check(spec["model_id"], token=token)
+    except Exception as error:
+        raise PermissionError(
+            f"HF_TOKEN belongs to account '{account}', which cannot read {spec['model_id']} ({type(error).__name__}): request access at https://huggingface.co/{spec['model_id']} with that account (approval is manual), or, for a fine-grained token, enable 'Read access to contents of all public gated repos you can access'."
+        ) from None
+    return {"account": account, "model_id": spec["model_id"], "access": True}
+
+
 def encoder_overrides(weights_root: str | Path | None = None) -> dict[str, str]:
     """``image_encoders`` for ``idol.IdolPipeline``: every encoder Idol's config names, replaced by a local snapshot."""
     root = Path(weights_root) if weights_root is not None else DEFAULT_WEIGHTS_ROOT

@@ -175,6 +175,12 @@ def stage_weights(run: Run) -> None:
     for key in SNAPSHOTS:  # every manifest must be pinned before a single byte is downloaded
         require_pinned(key, read_manifest(key, run.weights))
     in_manifests = {read_manifest(key, run.weights)["modelId"] for key in SNAPSHOTS}
+    from idol_3d_pipeline.pipeline import check_gated_access
+
+    for key, spec in SNAPSHOTS.items():  # a gated snapshot whose files are not staged yet: check the token first
+        if spec["gated"] and any(not (run.weights / key / e["path"]).is_file() for e in read_manifest(key, run.weights)["files"]):
+            access = check_gated_access(key, token())
+            print({"gated_snapshot": key, "token_account": access["account"], "access": access["access"]})
     records = []
     for key, spec in SNAPSHOTS.items():
         started = time.perf_counter()
