@@ -12,8 +12,8 @@ licence blocker; DINOv3's licence permits use and redistribution, its gate is an
 
 - **VAE route (Kurt, 2026-11-10):** load the FLUX.2 VAE from `black-forest-labs/FLUX.2-klein-4B` (Apache-2.0,
   ungated). Its `vae/config.json` names FLUX.2-dev as its origin; same `AutoencoderKLFlux2` architecture; half the
-  bytes (bf16). Equivalence with dev is presumed until the optional `vae_check` stage passes (gate 1 of the
-  ml-worker matrix row).
+  bytes (bf16). Equivalence with dev **verified at the weight level on 2026-11-10**: all 251 tensors bit-for-bit equal
+  after the bf16 cast Idol applies (`docs/release-verification.md`).
 - **DINOv3 route (Kurt, 2026-11-10): option (b), token.** The notebook reads `HF_TOKEN` from the runtime's
   secrets and fetches DINOv3 from its gated origin. Consequence: the default path needs a credential, which
   NOTEBOOK_SPEC RUN13 / MOD4 forbid, so the carrier stays **Candidate** (FLUX.1-schnell precedent). Re-hosting

@@ -7,6 +7,13 @@ notebook parity). From the generated notebook, the runtime-check and carrier cel
 refusal probes refused; the `weights` stage installed the carried manifests and stopped on the unpinned DINOv3
 before downloading anything. **No model has run yet:** torch and the model stages have never executed here.
 
+## Gate 1 (klein VAE = FLUX.2-dev VAE): passed at the weight level
+
+On 2026-11-10 every one of the 251 FLUX.2-dev VAE tensors, rounded to bf16 as torch does, was bit-for-bit equal to
+the klein VAE (record in `docs/release-verification.md`). Idol loads the VAE in bf16, so the parameters it uses are
+identical on this route. The notebook's optional `vae_check` stage repeats this with torch and adds Idol's own
+conditioning on a GPU.
+
 ## Blocking the first hosted run
 
 1. **DINOv3 digests are not recorded.** `weights/dinov3-vith16plus/dimer-base-manifest.json` pins the commit
@@ -14,10 +21,8 @@ before downloading anything. **No model has run yet:** torch and the model stage
    the notebook stops at Section 3, before any download.
 
    A Hugging Face token for account `kurtvalcorza` is saved on the cloud environment (huggingface.co network secret),
-   but on 2026-11-10 the Hub answered `403 GatedRepo: you are not in the authorized list` for **both**
-   `facebook/dinov3-vith16plus-pretrain-lvd1689m` and `black-forest-labs/FLUX.2-dev`. One of two things is missing:
-   - the account's access: request it on the DINOv3 page (manual approval) and accept the FLUX.2-dev terms; or
-   - the token's scope: a fine-grained token needs *Read access to contents of all public gated repos you can access*.
+   and FLUX.2-dev access works. The DINOv3 access request is **awaiting review by Meta** (Hub message, 2026-11-10);
+   approval is manual.
 
    Once access works, the maintainer session runs (no download of the weights; the Hub's LFS record gives their size
    and SHA-256):
