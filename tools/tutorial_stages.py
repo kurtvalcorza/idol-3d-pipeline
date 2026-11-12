@@ -388,7 +388,7 @@ def stage_byod(run: Run) -> None:
 
     from PIL import Image
 
-    from idol_3d_pipeline import InputRefused, validate_request
+    from idol_3d_pipeline import InputRefused, fit_within_limit, validate_request
 
     opts = run.options
     shutil.rmtree(run.out / f"{STEM}_byod", ignore_errors=True)  # never show results of an earlier BYOD run
@@ -401,16 +401,19 @@ def stage_byod(run: Run) -> None:
             image.load()
         except Exception as error:  # an unreadable file is a refusal, not a crash
             raise InputRefused(f"{file.name}: not a readable image ({type(error).__name__}); supply PNG, JPEG, WebP or BMP") from None
+        image, downscaled = fit_within_limit(image)
+        if downscaled:
+            print({"downscaled": file.name, "from": downscaled["from"], "to": downscaled["to"], "why": "longer side above the 4096 px input limit; Idol resizes to 1024 px anyway"})
         validate_request(image, mode=settings["mode"], steps=settings["steps"], num_gaussians=settings["num_gaussians"], name=file.name)
-        opened.append((name, file, image))
+        opened.append((name, file, image, downscaled))
     require_cuda("byod")
     pipe = load_pipeline(run)
     out_dir = run.out / f"{STEM}_byod"
     records, rows = [], []
-    for name, file, image in opened:
+    for name, file, image, downscaled in opened:
         generated = _generate_one(pipe, run, image, name, dict(settings), out_dir / name)
         evaluated, row = _evaluate_one(run, name, out_dir / name)
-        records.append({"source": file.name, **generated, "evaluation": evaluated})
+        records.append({"source": file.name, "downscaled": downscaled, **generated, "evaluation": evaluated})
         rows.append(row)
         print({"id": name, "gaussians": generated["gaussians"], "seconds": generated["seconds"], "ply": generated["ply"], "silhouette_iou": evaluated["silhouette_iou"], "verdict": evaluated["structure"]["verdict"]})
     panel(rows, out_dir / "previews.png", tile=VIEW_SIZE)

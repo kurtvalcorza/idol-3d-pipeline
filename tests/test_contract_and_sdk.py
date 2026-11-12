@@ -12,7 +12,7 @@ import pytest
 from PIL import Image
 
 from conftest import load_sdk_module
-from idol_3d_pipeline import SAMPLES, SDK_COMMIT, fetch_samples, prepare_with_mask, validate_request
+from idol_3d_pipeline import SAMPLES, SDK_COMMIT, fetch_samples, fit_within_limit, prepare_with_mask, validate_request
 from idol_3d_pipeline.samples import sample_url, verify_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,6 +41,36 @@ def test_vendored_sdk_is_byte_identical_to_the_pinned_upstream_commit():
 def test_invalid_requests_are_refused_with_the_rule(kwargs, message):
     with pytest.raises((ValueError, TypeError), match=message):
         validate_request(**kwargs)
+
+
+def test_an_oversized_image_is_shrunk_to_the_limit_and_recorded():
+    image, record = fit_within_limit(Image.new("RGB", (5000, 3000), (40, 90, 160)))
+    assert image.size == (4096, 2458) and image.mode == "RGB"
+    assert record == {"from": [5000, 3000], "to": [4096, 2458], "filter": "lanczos", "converted": None}
+    assert validate_request(image)["verdict"] == "accepted"
+
+
+def test_an_image_within_the_limit_is_returned_unchanged():
+    original = Image.new("RGB", (4096, 1024))
+    image, record = fit_within_limit(original)
+    assert image is original and record is None
+
+
+def test_shrinking_keeps_a_real_alpha_and_converts_a_palette_image():
+    rgba = Image.new("RGBA", (6000, 6000), (255, 0, 0, 0))
+    rgba.paste((0, 255, 0, 255), (2000, 2000, 4000, 4000))
+    shrunk, _ = fit_within_limit(rgba)
+    assert shrunk.mode == "RGBA" and shrunk.getpixel((0, 0))[3] == 0 and shrunk.getpixel((2048, 2048))[3] == 255
+    assert validate_request(shrunk)["has_alpha"] is True
+    palette, record = fit_within_limit(Image.new("P", (8192, 4096)))
+    assert palette.mode == "RGBA" and palette.size == (4096, 2048) and record["converted"] == "P -> RGBA"
+
+
+def test_a_very_elongated_image_is_still_refused_after_shrinking():
+    image, record = fit_within_limit(Image.new("RGB", (9000, 100)))
+    assert record["to"] == [4096, 46]
+    with pytest.raises(ValueError, match="shorter side"):
+        validate_request(image)
 
 
 def test_alpha_decides_whether_birefnet_runs():

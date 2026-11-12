@@ -269,6 +269,24 @@ def validate_request(image: Any, *, mode: str = "synthetic", steps: int = 50, nu
     }
 
 
+def fit_within_limit(image: Image.Image, *, limit: int = MAX_INPUT_SIDE) -> tuple[Image.Image, dict[str, Any] | None]:
+    """Shrink an image whose longer side exceeds ``limit`` to fit it, keeping the aspect ratio; return it and a record.
+
+    For Bring Your Own Data: camera photographs are often larger than the 4096 px the request contract accepts. Idol's
+    first step resizes the short side to 1024 px (Lanczos), so for any image no more elongated than 4:1 this shrink
+    changes nothing Idol uses. The record names the original and new size, so the change is never silent. Images
+    within the limit, and modes the contract refuses, are returned unchanged with ``None``; ``validate_request``
+    still judges the result (a very elongated image can still be refused for its shorter side)."""
+    width, height = image.size
+    if max(width, height) <= limit or image.mode not in ACCEPTED_PIL_MODES:
+        return image, None
+    scale = limit / max(width, height)
+    size = (max(1, int(round(width * scale))), max(1, int(round(height * scale))))
+    source = image.convert("RGBA") if image.mode == "P" else image  # a palette image cannot be filtered
+    record = {"from": [width, height], "to": list(size), "filter": "lanczos", "converted": "P -> RGBA" if image.mode == "P" else None}
+    return source.resize(size, Image.LANCZOS), record
+
+
 def prepare_with_mask(image: Image.Image, remove_background: Callable[[Image.Image], Image.Image], *, crop_margin: float, image_size: int = IMAGE_SIZE) -> tuple[Image.Image, np.ndarray]:
     """``idol.preprocess.preprocess_image`` step for step, also returning the cropped object mask (float in [0, 1]).
 

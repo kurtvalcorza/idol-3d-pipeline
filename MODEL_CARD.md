@@ -112,7 +112,7 @@ Built with DINOv3.
 
 ## Input/output contract
 
-Input: one PIL image of one object, 64..4096 px per side, mode `synthetic` or `real`, 1..100 steps, 32,768..1,048,576 Gaussians (multiple of 32). Output: a 3DGS `.ply` (z-up object turned y-up), the 1024 × 1024 model input and its mask, the predicted camera (yaw, pitch in radians; radius; field of view in degrees).
+Input: one PIL image of one object, 64..4096 px per side (the notebook's BYOD path first shrinks a larger image to 4096 px on its longer side and records it), mode `synthetic` or `real`, 1..100 steps, 32,768..1,048,576 Gaussians (multiple of 32). Output: a 3DGS `.ply` (z-up object turned y-up), the 1024 × 1024 model input and its mask, the predicted camera (yaw, pitch in radians; radius; field of view in degrees).
 
 ## Runtime and verification records
 

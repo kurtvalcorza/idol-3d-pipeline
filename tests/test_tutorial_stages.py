@@ -74,6 +74,16 @@ def test_byod_refuses_bad_paths_before_loading_any_model(tmp_path):
     assert error["type"] == "InputRefused" and "tiny.png" in error["message"] and "shorter side" in error["message"]
 
 
+def test_byod_shrinks_an_oversized_photo_instead_of_refusing_it(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("IDOL_ALLOW_CPU", raising=False)
+    big = tmp_path / "camera.png"
+    Image.new("RGB", (5000, 3000), (200, 120, 40)).save(big)
+    assert _run(tmp_path, "byod", "--byod-path", str(big)) == 2  # stops later: this environment has no GPU for Idol
+    error = json.loads((tmp_path / "run" / "state" / "byod.error.json").read_text())
+    assert error["type"] != "InputRefused" and "longer side" not in error["message"]
+    assert "'downscaled': 'camera.png', 'from': [5000, 3000], 'to': [4096, 2458]" in capsys.readouterr().out
+
+
 def test_byod_zip_extraction_ignores_entries_that_escape(tmp_path):
     archive = tmp_path / "images.zip"
     with zipfile.ZipFile(archive, "w") as zf:
