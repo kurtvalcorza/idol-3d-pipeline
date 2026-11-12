@@ -1,4 +1,4 @@
-# Status — Candidate (not yet run on a hosted runtime)
+# Status — Candidate (default path passed on a hosted Colab T4 via the Colab CLI, 2026-11-12)
 
 **2026-11-10.** Built on branch `ccr-deb2a494-n7dsf1`, reviewed twice (a torch-path review and a NOTEBOOK_SPEC 3.1
 review; their findings are fixed in `791b564` and after). CI-level checks pass locally (ruff; 46 tests without torch;
@@ -35,14 +35,18 @@ DINOv3 access.
 - **MODEL_CARD.md** is a first draft against MODEL_CARD_SPEC 1.2 and has not been reviewed.
 - **Evaluation** has no ground-truth 3D: structure, `.ply` read-back and an input-view silhouette IoU through an
   approximate renderer. Idol's camera is read with a fixed calibration (field of view × 0.6, yaw + 25°) fitted on the
-  two CPU splats, where it scored 0.866 and 0.874; the Colab run on three samples at full settings is its first test
-  on data it was not fitted to.
+  two CPU splats, where it scored 0.866 and 0.874. On its first test on data it was not fitted to (the 2026-11-12
+  Colab T4 run, three samples at full settings) it scored 0.4781, 0.7336 and 0.6847, below the uncalibrated reading
+  for the backpack. It does not transfer; it needs re-fitting on full-setting splats.
+- **Hosted run (2026-11-12):** the default path passed on a fresh Colab T4, 12/12 cells, 1109 s, driven by the Colab
+  CLI with `HF_TOKEN` from the environment (`docs/release-verification.md`). It is not a browser `Run all`.
 
 ## Next steps
 
-1. Colab T4 `Run all`; record the executed copy under `docs/execution-evidence/` and the run in
-   `docs/release-verification.md`.
-2. Optionally run Section 8 (`vae_check`, needs FLUX.2-dev access) and record the verdict in the ml-worker matrix row.
-3. REL12 BYOD journey on a hosted runtime.
+1. A browser `Run all` on Colab with the `HF_TOKEN` secret (the CLI run cannot exercise the secret path or forms).
+   The notebook's header still says no hosted run is recorded; update it at the next generator change.
+2. Re-fit (or replace) the input-view camera calibration on full-setting splats.
+3. Optionally run Section 8 (`vae_check`, needs FLUX.2-dev access) and record the verdict in the ml-worker matrix row.
+4. REL12 BYOD journey on a hosted runtime.
 
 Design and the calls made while building: `docs/superpowers/specs/2026-11-10-idol-3d-pipeline-design.md`.

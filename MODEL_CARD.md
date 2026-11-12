@@ -116,7 +116,8 @@ Input: one PIL image of one object, 64..4096 px per side, mode `synthetic` or `r
 
 ## Runtime and verification records
 
-See `docs/release-verification.md`. No hosted run recorded yet.
+See `docs/release-verification.md`. One hosted run is recorded: the default path on a fresh Colab T4 (Colab CLI,
+2026-11-12), all three samples at full settings, pass. It was not a browser `Run all`.
 
 ## References
 
