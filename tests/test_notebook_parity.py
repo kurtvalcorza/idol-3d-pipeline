@@ -50,7 +50,7 @@ def test_carried_files_equal_repository_sources(notebook):
 
 def test_the_whole_vendored_sdk_is_carried(notebook):
     files, _ = _carrier(notebook)
-    vendored = {str(p.relative_to(ROOT)) for p in (ROOT / "src" / "idol").rglob("*.py")}
+    vendored = {p.relative_to(ROOT).as_posix() for p in (ROOT / "src" / "idol").rglob("*.py")}
     assert vendored <= set(files)
 
 
@@ -73,6 +73,45 @@ def test_token_is_read_once_passed_to_stages_and_never_printed(notebook):
     assert "stage_env = dict(ENV, HF_TOKEN=HF_TOKEN_VALUE) if stage in TOKEN_STAGES" in install
     assert "ENV['HF_TOKEN']" not in install, "uv, the install and the probe must run without the token"
     assert all("write_text(HF_TOKEN_VALUE" not in s for s in sources)
+
+
+def _run_token_cell(notebook, monkeypatch, env_token):
+    """Run the token cell under a fake google.colab whose userdata cannot reach a Colab UI, as under the Colab CLI."""
+    import os
+    import sys
+    import types
+
+    source = next(_source(c) for c in notebook["cells"] if c["cell_type"] == "code" and "userdata.get('HF_TOKEN')" in _source(c))
+
+    class TimeoutException(Exception):
+        pass
+
+    def get(name):
+        raise TimeoutException(f"Requesting secret {name} timed out. Secrets can only be fetched when running from the Colab UI.")
+
+    colab = types.ModuleType("google.colab")
+    colab.userdata = types.SimpleNamespace(get=get)
+    monkeypatch.setitem(sys.modules, "google", types.ModuleType("google"))
+    monkeypatch.setitem(sys.modules, "google.colab", colab)
+    if env_token is None:
+        monkeypatch.delenv("HF_TOKEN", raising=False)
+    else:
+        monkeypatch.setenv("HF_TOKEN", env_token)
+    scope = {"os": os}
+    exec(compile(source, "token_cell", "exec"), scope)
+    return scope
+
+
+def test_token_cell_falls_back_to_the_environment_without_a_colab_ui(notebook, monkeypatch, capsys):
+    scope = _run_token_cell(notebook, monkeypatch, "hf_dummyvalue0123")
+    assert scope["HF_TOKEN_VALUE"] == "hf_dummyvalue0123" and scope["HF_TOKEN_SOURCE"] == "the environment"
+    printed = capsys.readouterr().out
+    assert "hf_dummyvalue0123" not in printed and "read from the environment (17 characters" in printed
+
+
+def test_token_cell_still_refuses_without_a_secret_or_an_environment_token(notebook, monkeypatch):
+    with pytest.raises(RuntimeError, match=r"No HF_TOKEN secret is readable.*\(TimeoutException\)"):
+        _run_token_cell(notebook, monkeypatch, None)
 
 
 def test_metadata_declares_profile_spec_and_candidate_boundary(notebook):

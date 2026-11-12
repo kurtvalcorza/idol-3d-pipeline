@@ -387,21 +387,24 @@ WEIGHTS_CELL = """# @title Infrastructure: stage and digest-verify the pinned sn
 run_stage('weights')"""
 
 TOKEN_CELL = """# @title Infrastructure: read HF_TOKEN from this runtime's secrets (needed for the gated DINOv3 encoder)
-HF_TOKEN_VALUE = None
+HF_TOKEN_VALUE, HF_TOKEN_SOURCE = None, 'secrets'
 try:
     from google.colab import userdata
-    HF_TOKEN_VALUE = userdata.get('HF_TOKEN')
+    try:
+        HF_TOKEN_VALUE = userdata.get('HF_TOKEN')
+    except Exception as error:  # the secret is missing, this notebook has no access to it, or there is no Colab UI (Colab CLI)
+        HF_TOKEN_VALUE, HF_TOKEN_SOURCE = os.environ.get('HF_TOKEN'), 'the environment'
+        if not HF_TOKEN_VALUE:
+            raise RuntimeError('No HF_TOKEN secret is readable: in Colab open the key icon on the left, add a secret named HF_TOKEN holding a token of a Hugging Face account that has accepted the terms at https://huggingface.co/{gated}, switch on Notebook access, then run this cell again. (' + type(error).__name__ + ')') from None
 except ImportError:  # not Colab: Kaggle secrets, then the environment
     try:
         from kaggle_secrets import UserSecretsClient
         HF_TOKEN_VALUE = UserSecretsClient().get_secret('HF_TOKEN')
     except Exception:
-        HF_TOKEN_VALUE = os.environ.get('HF_TOKEN')
-except Exception as error:  # the secret is missing, or this notebook was not given access to it
-    raise RuntimeError('No HF_TOKEN secret is readable: in Colab open the key icon on the left, add a secret named HF_TOKEN holding a token of a Hugging Face account that has accepted the terms at https://huggingface.co/{gated}, switch on Notebook access, then run this cell again. (' + type(error).__name__ + ')') from None
+        HF_TOKEN_VALUE, HF_TOKEN_SOURCE = os.environ.get('HF_TOKEN'), 'the environment'
 if not HF_TOKEN_VALUE:
     raise RuntimeError('HF_TOKEN is empty: add a token of a Hugging Face account that has accepted the terms at https://huggingface.co/{gated} as a secret named HF_TOKEN, then run this cell again.')
-print({{'hf_token': 'read from secrets (' + str(len(HF_TOKEN_VALUE)) + ' characters; not printed, not written to disk)', 'used_for': {gated!r}}})"""
+print({{'hf_token': 'read from ' + HF_TOKEN_SOURCE + ' (' + str(len(HF_TOKEN_VALUE)) + ' characters; not printed, not written to disk)', 'used_for': {gated!r}}})"""
 
 
 def environment_key(ctx: dict[str, Any], template: dict[str, Any]) -> str:

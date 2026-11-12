@@ -23,7 +23,7 @@ def test_vendored_sdk_is_byte_identical_to_the_pinned_upstream_commit():
     assert SDK_HASHES["commit"] == SDK_COMMIT
     for relative, digest in SDK_HASHES["files"].items():
         assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == digest, f"{relative} drifted from idol-sdk@{SDK_COMMIT[:7]}"
-    on_disk = {str(p.relative_to(ROOT)) for p in (ROOT / "src" / "idol").rglob("*.py")}
+    on_disk = {p.relative_to(ROOT).as_posix() for p in (ROOT / "src" / "idol").rglob("*.py")}
     assert on_disk == set(SDK_HASHES["files"]), "every vendored file is recorded, and nothing else sits in src/idol"
 
 
