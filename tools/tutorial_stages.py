@@ -304,7 +304,7 @@ def _evaluate_one(run: Run, name: str, out_dir: Path, convention: str | None = N
         "convention_used": chosen,
         "calibration": {k: CALIBRATION[k] for k in ("fov_scale", "yaw_offset_deg", "pitch_offset_deg")},
         "silhouette_iou_uncalibrated_diagnostic": raw,
-        "silhouette_iou_note": "under the fixed camera calibration in render.py (field of view x 0.6, yaw + 25 deg), applied unchanged to every splat; the uncalibrated readings are diagnostics only",
+        "silhouette_iou_note": f"under the fixed camera calibration in render.py (field of view x {CALIBRATION['fov_scale']:g}, yaw {CALIBRATION['yaw_offset_deg']:+g} deg, pitch {CALIBRATION['pitch_offset_deg']:+g} deg), applied unchanged to every splat; the uncalibrated readings are diagnostics only",
         "renderer": {"pairs": front["pairs"], "cut_at_max_radius": front["cut_at_max_radius"], "kind": "approximate NumPy EWA splatting (render.py), not the 3DGS rasterizer"},
     }
     model_input = Image.open(out_dir / f"{name}_input.png")

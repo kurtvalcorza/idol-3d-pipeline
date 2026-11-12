@@ -35,5 +35,33 @@ on an approximate renderer, not a pass gate (the `render` verdict rests on struc
 so the run passes, but the IoU numbers should not be quoted as a quality measure until the calibration is re-fitted
 on full-setting splats or replaced.
 
+## Camera calibration re-fit, 2026-11-12 (closes the observation above)
+
+**Splats.** The three default-path splats were regenerated on a second fresh Colab T4 (Colab CLI 0.7.5, the same
+notebook blob `052aa0ed…` at `71564c0`, 12/12 cells, 0 errors) and downloaded before the VM was released. Every
+silhouette IoU of that run, calibrated and uncalibrated, equals the recorded run's above, and re-scoring the
+downloaded `state/*.npz` locally reproduces 0.4781 / 0.7336 / 0.6847, so the local scoring is the stage's own.
+
+**Fit.** `tools/fit_camera_calibration.py`, leave-one-out: each splat is scored with the calibration that fits the
+other two best. Coarse grid (field-of-view scale 0.4–1.2 by 0.1, yaw ±60° by 10°, pitch ±10° by 10°), then a fine grid
+(0.65–0.75 by 0.025, yaw −40° to +20° by 5°, pitch ±5° by 5°); `toward_camera` convention, 256 px, as the stage.
+
+| | uncalibrated | 2026-11-10 calibration (× 0.6, + 25°) | **held out** (fine grid) | new calibration, in-sample |
+|---|---|---|---|---|
+| backpack | 0.5202 | 0.4781 | **0.7755** | 0.7755 |
+| armchair | 0.4503 | 0.7336 | **0.6812** | 0.7586 |
+| porcini | 0.5121 | 0.6847 | **0.8682** | 0.9567 |
+| mean | 0.494 | 0.632 | **0.775** | 0.830 |
+
+Every held-out score beats its uncalibrated reading, the acceptance rule, so the calibration fitted on all three is
+now in `render.py`: **field of view × 0.725, yaw − 5°, pitch unchanged**. The field-of-view scale is stable across
+folds (0.7–0.725); the yaw offset is not (the best yaw per object is about −30° for the backpack, +10° for the armchair
+and −10° to 0° for the porcini), so the yaw is a compromise and the held-out mean (0.775) is the figure to quote, not
+the in-sample one. The `render` stage itself, re-run locally on the downloaded splats with the new calibration, gives
+0.7755 / 0.7586 / 0.9567 with the same structure and read-back verdicts. That re-run is local, not a hosted run of the
+new notebook; three objects and one seed each are a small sample. Records:
+`docs/execution-evidence/2026-11-12-calibration-fit/` (`fit_coarse.json`, `fit_fine.json` with every IoU in
+`fit_fine.tables.json`, and the local render stage's `evaluation_rerender.json` and `previews_rerender.png`).
+
 A hosted Colab T4 `Run all` is required before any Release-grade claim; the RUN13/MOD4 deviation (see `STATUS.md`)
 caps the notebook at Candidate regardless.

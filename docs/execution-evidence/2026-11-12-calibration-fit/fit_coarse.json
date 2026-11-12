@@ -1,0 +1,123 @@
+{
+ "grid": {
+  "fov_scale": [
+   0.4,
+   0.5,
+   0.6,
+   0.7,
+   0.8,
+   0.9,
+   1.0,
+   1.1,
+   1.2
+  ],
+  "yaw_offset_deg": [
+   -60,
+   -50,
+   -40,
+   -30,
+   -20,
+   -10,
+   0,
+   10,
+   20,
+   25,
+   30,
+   40,
+   50,
+   60
+  ],
+  "pitch_offset_deg": [
+   -10,
+   0,
+   10
+  ],
+  "size": 256,
+  "convention": "toward_camera",
+  "points": 378
+ },
+ "samples": [
+  "backpack",
+  "armchair",
+  "porcini"
+ ],
+ "uncalibrated_iou": {
+  "backpack": 0.5202,
+  "armchair": 0.4503,
+  "porcini": 0.5121
+ },
+ "current_calibration": {
+  "calibration": {
+   "fov_scale": 0.6,
+   "yaw_offset_deg": 25.0,
+   "pitch_offset_deg": 0.0
+  },
+  "iou": {
+   "backpack": 0.4781,
+   "armchair": 0.7336,
+   "porcini": 0.6847
+  }
+ },
+ "leave_one_out": {
+  "backpack": {
+   "fitted_on": [
+    "armchair",
+    "porcini"
+   ],
+   "calibration": {
+    "fov_scale": 0.7,
+    "yaw_offset_deg": 10.0,
+    "pitch_offset_deg": 0.0
+   },
+   "train_mean_iou": 0.8516,
+   "held_out_iou": 0.7034,
+   "uncalibrated_iou": 0.5202,
+   "beats_uncalibrated": true
+  },
+  "armchair": {
+   "fitted_on": [
+    "backpack",
+    "porcini"
+   ],
+   "calibration": {
+    "fov_scale": 0.7,
+    "yaw_offset_deg": -30.0,
+    "pitch_offset_deg": 0.0
+   },
+   "train_mean_iou": 0.8504,
+   "held_out_iou": 0.678,
+   "uncalibrated_iou": 0.4503,
+   "beats_uncalibrated": true
+  },
+  "porcini": {
+   "fitted_on": [
+    "backpack",
+    "armchair"
+   ],
+   "calibration": {
+    "fov_scale": 0.7,
+    "yaw_offset_deg": -30.0,
+    "pitch_offset_deg": -10.0
+   },
+   "train_mean_iou": 0.7651,
+   "held_out_iou": 0.8389,
+   "uncalibrated_iou": 0.5121,
+   "beats_uncalibrated": true
+  }
+ },
+ "held_out_mean_iou": 0.7401,
+ "final": {
+  "calibration": {
+   "fov_scale": 0.7,
+   "yaw_offset_deg": -10.0,
+   "pitch_offset_deg": 0.0
+  },
+  "in_sample_iou": {
+   "backpack": 0.7687,
+   "armchair": 0.7396,
+   "porcini": 0.9205
+  },
+  "in_sample_mean_iou": 0.8096
+ },
+ "accepted": true
+}

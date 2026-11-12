@@ -54,7 +54,8 @@ def test_render_stage_checks_structure_file_and_silhouette(tmp_path):
     from idol_3d_pipeline import CONVENTIONS
 
     assert set(sample["silhouette_iou_uncalibrated_diagnostic"]) == set(CONVENTIONS)
-    assert record["camera_calibration"]["fov_scale"] == 0.6
+    assert record["camera_calibration"]["fov_scale"] == CALIBRATION["fov_scale"] == 0.725
+    assert "x 0.725, yaw -5 deg" in sample["silhouette_iou_note"]
     assert (tmp_path / "run" / "outputs" / "previews.png").is_file()
 
 def test_a_stage_run_out_of_order_fails_with_an_instruction(tmp_path):

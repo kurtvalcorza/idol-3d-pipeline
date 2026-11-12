@@ -34,19 +34,18 @@ DINOv3 access.
   CC0 iNaturalist photograph (porcini, observation 187524159) so the `real` mode runs on the default path.
 - **MODEL_CARD.md** is a first draft against MODEL_CARD_SPEC 1.2 and has not been reviewed.
 - **Evaluation** has no ground-truth 3D: structure, `.ply` read-back and an input-view silhouette IoU through an
-  approximate renderer. Idol's camera is read with a fixed calibration (field of view × 0.6, yaw + 25°) fitted on the
-  two CPU splats, where it scored 0.866 and 0.874. On its first test on data it was not fitted to (the 2026-11-12
-  Colab T4 run, three samples at full settings) it scored 0.4781, 0.7336 and 0.6847, below the uncalibrated reading
-  for the backpack. It does not transfer; it needs re-fitting on full-setting splats.
+  approximate renderer. Idol's camera is read with a fixed calibration (field of view × 0.725, yaw − 5°), re-fitted
+  on 2026-11-12 by leave-one-out on the three T4 splats (`tools/fit_camera_calibration.py`): held-out IoU 0.776,
+  0.681, 0.868 (mean 0.775; uncalibrated mean 0.494). It replaced the 2026-11-10 CPU fit (× 0.6, + 25°), which
+  scored 0.48–0.73 on the T4 splats. The best yaw differs by object, so one fixed yaw is a compromise.
 - **Hosted run (2026-11-12):** the default path passed on a fresh Colab T4, 12/12 cells, 1109 s, driven by the Colab
   CLI with `HF_TOKEN` from the environment (`docs/release-verification.md`). It is not a browser `Run all`.
 
 ## Next steps
 
-1. A browser `Run all` on Colab with the `HF_TOKEN` secret (the CLI run cannot exercise the secret path or forms).
-   The notebook's header still says no hosted run is recorded; update it at the next generator change.
-2. Re-fit (or replace) the input-view camera calibration on full-setting splats.
-3. Optionally run Section 8 (`vae_check`, needs FLUX.2-dev access) and record the verdict in the ml-worker matrix row.
-4. REL12 BYOD journey on a hosted runtime.
+1. A browser `Run all` on Colab with the `HF_TOKEN` secret (the CLI run cannot exercise the secret path or forms);
+   it also gives the first hosted render with the new calibration.
+2. Optionally run Section 8 (`vae_check`, needs FLUX.2-dev access) and record the verdict in the ml-worker matrix row.
+3. REL12 BYOD journey on a hosted runtime.
 
 Design and the calls made while building: `docs/superpowers/specs/2026-11-10-idol-3d-pipeline-design.md`.
