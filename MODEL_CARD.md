@@ -116,8 +116,9 @@ Input: one PIL image of one object, 64..4096 px per side, mode `synthetic` or `r
 
 ## Runtime and verification records
 
-See `docs/release-verification.md`. One hosted run is recorded: the default path on a fresh Colab T4 (Colab CLI,
-2026-11-12), all three samples at full settings, pass. It was not a browser `Run all`.
+See `docs/release-verification.md`. Two hosted runs are recorded, both the default path on a fresh Colab T4 (Colab
+CLI, 2026-11-12), all three samples at full settings, pass; the second, at `1338a4a`, uses the re-fitted camera
+calibration (input-view silhouette IoU 0.78 / 0.76 / 0.96; held-out 0.78 / 0.68 / 0.87). Neither was a browser `Run all`.
 
 ## References
 

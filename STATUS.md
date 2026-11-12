@@ -1,4 +1,4 @@
-# Status — Candidate (default path passed on a hosted Colab T4 via the Colab CLI, 2026-11-12)
+# Status — Candidate (default path passed on a hosted Colab T4 via the Colab CLI, 2026-11-12, at `1338a4a`)
 
 **2026-11-10.** Built on branch `ccr-deb2a494-n7dsf1`, reviewed twice (a torch-path review and a NOTEBOOK_SPEC 3.1
 review; their findings are fixed in `791b564` and after). CI-level checks pass locally (ruff; 46 tests without torch;
@@ -38,13 +38,14 @@ DINOv3 access.
   on 2026-11-12 by leave-one-out on the three T4 splats (`tools/fit_camera_calibration.py`): held-out IoU 0.776,
   0.681, 0.868 (mean 0.775; uncalibrated mean 0.494). It replaced the 2026-11-10 CPU fit (× 0.6, + 25°), which
   scored 0.48–0.73 on the T4 splats. The best yaw differs by object, so one fixed yaw is a compromise.
-- **Hosted run (2026-11-12):** the default path passed on a fresh Colab T4, 12/12 cells, 1109 s, driven by the Colab
-  CLI with `HF_TOKEN` from the environment (`docs/release-verification.md`). It is not a browser `Run all`.
+- **Hosted runs (2026-11-12):** the default path passed on a fresh Colab T4 twice, driven by the Colab CLI with
+  `HF_TOKEN` from the environment (`docs/release-verification.md`): at `71564c0` (12/12 cells, 1109 s) and at
+  `1338a4a` with the re-fitted calibration (12/12 cells, 1075 s; IoU 0.7755 / 0.7586 / 0.9567). Neither is a
+  browser `Run all`.
 
 ## Next steps
 
-1. A browser `Run all` on Colab with the `HF_TOKEN` secret (the CLI run cannot exercise the secret path or forms);
-   it also gives the first hosted render with the new calibration.
+1. A browser `Run all` on Colab with the `HF_TOKEN` secret (the CLI runs cannot exercise the secret path or forms).
 2. Optionally run Section 8 (`vae_check`, needs FLUX.2-dev access) and record the verdict in the ml-worker matrix row.
 3. REL12 BYOD journey on a hosted runtime.
 
