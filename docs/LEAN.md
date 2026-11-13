@@ -11,7 +11,7 @@ axioms (`propext`, `Classical.choice`, `Quot.sound`). The same approach is used 
 |---|---|---|
 | Proofs over ℝ | `lean/Idol3d/*.lean` | the mathematics is right, for all inputs |
 | Property tests | `tests/test_properties.py` | the Python, in floating point, has each proved property (Hypothesis, 150 random cases per Hypothesis test) |
-| Executable reference | `lean/Idol3d/Reference/Float.lean`, `tests/test_lean_reference.py` | a second, independent `Float` implementation gives the Python's numbers |
+| Executable reference | `lean/Idol3d/Reference/Float.lean`, `tests/test_lean_reference.py` | a second, independent `Float` implementation of `camera_pose`, `quaternion_to_matrix`, the decode round trip and one-pixel compositing gives the Python's numbers (the EWA footprint is checked by the property test instead) |
 
 Nothing here checks Idol, the encoders, the VAE or any measured number.
 
@@ -38,16 +38,21 @@ Hypothesis. CI's `lean` job builds the proofs with Mathlib's cache, runs `axiom-
 
 | Python | Lean | Theorems | Property test |
 |---|---|---|---|
-| `decode_camera` (SDK) then `camera_pose`'s `d` | `sdkYaw`, `sdkPitch`, `direction` | `direction_decode`, `direction_unit` | `test_renderer_rebuilds_the_sdk_direction` |
+| `decode_camera` (SDK) then `camera_pose`'s `d` | `sdkYaw`, `sdkPitch`, `direction` | `direction_decode`, `direction_unit` | `test_renderer_rebuilds_the_sdk_direction`, `test_sdk_decode_camera_round_trip` (torch) |
 | `camera_pose`, all four `CONVENTIONS` | `centre`, `forward`, `right`, `cameraAxes` | `len_centre`, `forward_eq`, `cameraAxes_eq`, `cameraAxes_orthogonal`, `det_cameraAxes`, `up_z_plain` | `test_camera_axes` |
 | the `*_mirrored` conventions | `cameraAxes` | `cameraAxes_mirrored` | `test_mirrored_is_upside_down` |
 | `orbit` | `centre` | `centre_orbit` | `test_orbit_turns_clockwise` |
-| the field of view (`decode_camera`, `render`'s focal length) | — | `halfWidth_to_edge` | `test_half_width_reaches_the_image_edge` |
+| the field of view (`decode_camera`, `render`'s focal length) | — | `halfWidth_to_edge` | `test_half_width_reaches_the_image_edge`, `test_sdk_decode_camera_round_trip` (torch) |
 | `quaternion_to_matrix` | `quatMatrix`, `normalise` | `quaternion_to_matrix_rotation`, `quatMatrix_eq_H` | `test_quaternion_to_matrix_is_a_rotation` |
 | the EWA footprint in `render` | `lamMax` | `cov2_gram`, `gram2_psd`, `det_lowpass_ge`, `valid_always`, `inverse_correct`, `lamMax_ge`, `lamMax_char`, `three_sigma_cover`, `pixel_enumerated` | `test_footprint_covers_the_three_sigma_ellipse` |
 | front-to-back compositing in `render` | `transmittance` | `sum_weights`, `exp_sum_log`, `transmittance_mem`, `accumulated_mem`, `image_mem` | `test_front_to_back_compositing` |
-| `save_ply`'s axis change (SDK), `ply_roundtrip` | `plyAxes` | `plyAxes_rotation` | `test_ply_axes_are_a_rotation_that_puts_up_along_minus_y` |
+| `save_ply`'s axis change (SDK), `ply_roundtrip` | `plyAxes` | `plyAxes_rotation` | `test_sdk_save_ply_axes` (torch), `test_ply_axes_are_a_rotation_that_puts_up_along_minus_y` |
 | `silhouette_iou` | `silhouetteIoU` | `silhouetteIoU_mem`, `silhouetteIoU_comm`, `silhouetteIoU_empty` | `test_silhouette_iou` |
+
+The SDK rows' torch tests run the vendored `decode_camera` and `save_ply` themselves and skip without torch (CI does
+not install it); the torch-free tests use the same formulas transcribed (`conftest.write_3dgs_ply`), which the
+SDK's pinned hashes (`tests/test_contract_and_sdk.py`) keep from drifting. One floating-point exception: near the
+pole the decode round trip loses up to about 2e-8 (√eps), so that test's tolerance is 5e-8.
 
 Files: `Idol3d/Basic.lean`, `Camera.lean`, `Quaternion.lean`, `Ewa.lean`, `Composite.lean`, `Metrics.lean`. 34 theorems.
 Theorems not in the table (`quatMatrixH_mul_transpose`, `det_quatMatrixH`, `dot_self_nonneg`) are proof steps.
@@ -56,9 +61,11 @@ Theorems not in the table (`quatMatrixH_mul_transpose`, `det_quatMatrixH`, `dot_
 
 1. **The `*_mirrored` conventions are upside down, not mirrored.** `camera_pose` negates `right` and then computes
    `up = cross(right, forward)`, so `up` flips too. The result is the plain camera turned 180° about its view axis
-   (`cameraAxes_mirrored`); every convention has the same handedness (`det_cameraAxes`). So the 2026-11-10 search over
-   "mirroring" (tutorial, "What did not work") searched upside-down readings, not mirror images; a mirror image was
-   never one of the candidates. The fitted calibration uses the plain `toward_camera` reading, so it is unaffected.
+   (`cameraAxes_mirrored`); every convention has the same handedness (`det_cameraAxes`). The tutorial's "What did not
+   work" says the 2026-11-10 fit searched "mirroring"; that search script is not in the repository, but if it used
+   the `*_mirrored` conventions, the only mirroring the renderer has, it tried 180°-rotated readings, never a mirror
+   image. The current calibration uses the plain `toward_camera` reading, so it is unaffected. The `*_mirrored`
+   names and that tutorial sentence are worth correcting in #1 (the tutorial needs a notebook regeneration).
 2. **The `.ply` puts the object's up along −y.** `save_ply` applies `(x, y, z) ↦ (x, −z, y)`, the +90° rotation about
    x that its comment names. That is a proper rotation (not a mirror image), but it sends +z to −y
    (`plyAxes_rotation`), while the comment, and `ply_roundtrip`'s docstring, call the target "the y-up convention
@@ -73,8 +80,8 @@ Theorems not in the table (`quatMatrixH_mul_transpose`, `det_quatMatrixH`, `dot_
 5. **The two clips in `render` are no-ops in exact arithmetic.** The weights telescope to `1 − Π(1 − α)`, so the
    accumulated opacity and the image are already in [0, 1] (`accumulated_mem`, `image_mem`), and the log form of
    the transmittance is exact while `α < 1` (`exp_sum_log`; `ALPHA_MAX = 0.99`).
-6. **The SDK's field of view is the object's half-width.** With `fov = 2 atan(w / radius)`, a point `w` to the
-   side at the object's distance lands exactly on the image edge (`halfWidth_to_edge`); the calibration's × 0.725
+6. **The SDK's field of view frames the half-width `w` at the object's distance.** With `fov = 2 atan(w / radius)`,
+   a point `w` to the side at the object's distance lands exactly on the image edge (`halfWidth_to_edge`); the calibration's × 0.725
    scales that.
 7. **`silhouette_iou` returns NaN for two empty silhouettes**, a third convention beside insect-3d-reconstruction's
    `None` and `0`.

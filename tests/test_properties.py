@@ -13,12 +13,12 @@ import pytest
 
 pytest.importorskip("hypothesis")
 
-from hypothesis import assume, given, settings
+from hypothesis import assume, example, given, settings
 from hypothesis import strategies as st
 
-from conftest import write_3dgs_ply
+from conftest import load_sdk_module, write_3dgs_ply
 from idol_3d_pipeline import CONVENTIONS, camera_pose, orbit, render, silhouette_iou
-from idol_3d_pipeline.metrics import read_ply
+from idol_3d_pipeline.metrics import ply_roundtrip, read_ply
 from idol_3d_pipeline.render import quaternion_to_matrix
 
 settings.register_profile("idol3d", max_examples=150, deadline=None)
@@ -43,13 +43,36 @@ def direction(yaw: float, pitch: float) -> np.ndarray:
 
 
 @given(st.tuples(coords, coords, coords).map(np.array).filter(lambda v: np.linalg.norm(v) > 1e-3))
+@example(np.array([0.0, 5.960464477539063e-08, 3.0]))  # near the pole, where the float round trip is worst
 def test_renderer_rebuilds_the_sdk_direction(v):
     """lean: direction_decode, direction_unit — the yaw and pitch ``decode_camera`` reports
-    (``atan2(dx, dy)``, ``asin(dz)``) put the camera back on the decoded direction."""
+    (``atan2(dx, dy)``, ``asin(dz)``) put the camera back on the decoded direction.
+
+    Floating point: near the pole ``dz`` is within an ulp of ±1, and ``cos(asin(dz))`` loses the horizontal part up to
+    about √(2·eps) ≈ 2e-8, hence the tolerance (exact over the reals)."""
     d = v / np.linalg.norm(v)
     yaw, pitch = math.atan2(d[0], d[1]), math.asin(float(np.clip(d[2], -1, 1)))
     pose = camera_pose({"yaw": yaw, "pitch": pitch, "radius": 1.0, "fov": 40.0}, "toward_camera")
-    np.testing.assert_allclose(pose["centre"], d, atol=1e-9)
+    np.testing.assert_allclose(pose["centre"], d, atol=5e-8)
+
+
+@given(st.tuples(coords, coords, coords).map(np.array).filter(lambda v: np.linalg.norm(v) > 1e-2),
+       st.floats(0.05, 2.0), st.floats(0.02, 0.5))
+def test_sdk_decode_camera_round_trip(v, inverse_distance, half_width):
+    """lean: direction_decode, halfWidth_to_edge — the vendored SDK's own ``decode_camera`` reports
+    ``yaw = atan2(dx, dy)``, ``pitch = asin(dz)`` of its (float32) unit direction, which ``camera_pose`` turns back
+    into that direction, and ``fov = 2 atan(w / radius)``. Skips without torch (the SDK is hash-pinned in
+    test_contract_and_sdk.py). The SDK works in float32, so near the pole the round trip loses up to √(2·eps32) ≈ 5e-4."""
+    torch = pytest.importorskip("torch")
+    camera = load_sdk_module("camera.py")
+    latent = torch.tensor([*v, inverse_distance, half_width], dtype=torch.float32)
+    decoded = camera.decode_camera(latent)
+    d32 = (latent[:3] / torch.norm(latent[:3])).tolist()
+    assert decoded["yaw"] == pytest.approx(math.atan2(d32[0], d32[1]), abs=1e-6)
+    assert decoded["pitch"] == pytest.approx(math.asin(max(-1.0, min(1.0, d32[2]))), abs=1e-6)
+    pose = camera_pose({**decoded, "radius": 1.0}, "toward_camera")
+    np.testing.assert_allclose(pose["centre"], v / np.linalg.norm(v), atol=1e-3)
+    assert math.tan(math.radians(decoded["fov"]) / 2) == pytest.approx(half_width / decoded["radius"], rel=1e-5)
 
 
 @given(angles, pitches, radii, conventions)
@@ -141,7 +164,7 @@ def test_footprint_covers_the_three_sigma_ellipse(xyz, scaling, quat):
     lam = np.linalg.eigvalsh(cov2).max()
     radius = math.ceil(3 * math.sqrt(lam))
     assume(radius <= 24 and 0 <= u < size and 0 <= v < size)  # MAX_RADIUS not reached, centre on screen
-    opacity = 0.9
+    opacity = 1.0  # at the ALPHA_MAX clamp
     out = render({"xyz": np.array([xyz]), "scaling": np.array([scaling]), "rotation": np.array([quat], float),
                   "opacity": np.array([opacity]), "rgb": np.zeros((1, 3))}, cam, size=size)["alpha"]
     inv = np.linalg.inv(cov2)
@@ -179,6 +202,27 @@ def test_front_to_back_compositing(opacities, reds):
 # ------------------------------------------------------------------------------------------------- Metrics.lean
 
 
+def test_sdk_save_ply_axes(tmp_path):
+    """lean: plyAxes_rotation — the vendored SDK's own ``Gaussian.save_ply``: a proper rotation sending +z to -y, and
+    ``ply_roundtrip`` accepts the file it writes. Skips without torch."""
+    torch = pytest.importorskip("torch")
+    gaussian = load_sdk_module("gaussian.py")
+    g = object.__new__(gaussian.Gaussian)  # set the activated values directly; the constructor only activates raw ones
+    g.xyz = torch.eye(3)
+    g.features_dc = torch.zeros(3, 1, 3)
+    g.scaling = torch.full((3, 3), 0.01)
+    g.rotation = torch.tensor([[1.0, 0, 0, 0]] * 3)
+    g.opacity = torch.full((3, 1), 0.5)
+    path = tmp_path / "sdk.ply"
+    g.save_ply(str(path))
+    m = read_ply(path)["values"][:, :3].T
+    assert np.linalg.det(m) == pytest.approx(1.0, abs=1e-6)
+    np.testing.assert_allclose(m @ [0, 0, 1], [0, -1, 0], atol=1e-6)
+    arrays = {"xyz": np.eye(3), "scaling": np.full((3, 3), 0.01), "rotation": np.tile([1.0, 0, 0, 0], (3, 1)),
+              "opacity": np.full(3, 0.5), "rgb": np.full((3, 3), 0.5)}
+    assert ply_roundtrip(path, arrays)["verified"]
+
+
 def test_ply_axes_are_a_rotation_that_puts_up_along_minus_y(tmp_path):
     """lean: plyAxes_rotation — the ``.ply`` axis change is a proper rotation, and the object's up (+z) lands on -y,
     which is up for a y-down viewer, down for a y-up one."""
@@ -191,6 +235,7 @@ def test_ply_axes_are_a_rotation_that_puts_up_along_minus_y(tmp_path):
     np.testing.assert_allclose(m @ m.T, np.eye(3), atol=1e-6)
     assert np.linalg.det(m) == pytest.approx(1.0, abs=1e-6)
     np.testing.assert_allclose(m @ [0, 0, 1], [0, -1, 0], atol=1e-6)
+    assert ply_roundtrip(path, arrays)["verified"]
 
 
 @given(st.integers(1, 6).flatmap(lambda h: st.tuples(st.lists(st.booleans(), min_size=h * 4, max_size=h * 4),
@@ -203,3 +248,5 @@ def test_silhouette_iou(ab):
         assert math.isnan(iou)
     else:
         assert 0 <= iou <= 1 and iou == silhouette_iou(b, a)
+        inter, union = (a.astype(bool) & b.astype(bool)).sum(), (a.astype(bool) | b.astype(bool)).sum()
+        assert iou == pytest.approx(inter / union)
