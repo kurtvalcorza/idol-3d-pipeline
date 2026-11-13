@@ -1,0 +1,17 @@
+name = "idol3d"
+defaultTargets = ["Idol3d"]
+
+[leanOptions]
+autoImplicit = false
+
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4"
+rev = "048fffa1dbcd080d3058fab41d8c188168595c22"
+
+[[lean_lib]]
+name = "Idol3d"
+
+[[lean_exe]]
+name = "idol3d-ref"
+root = "Main"
