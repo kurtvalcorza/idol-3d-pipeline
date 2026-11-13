@@ -13,3 +13,5 @@ weights/**/*.json
 !weights/**/dimer-base-manifest.json
 weights/**/.cache/
 weights/samples/
+# Lean build outputs and the Mathlib checkout/cache (~7 GB); rebuilt by `lake exe cache get && lake build`
+lean/.lake/

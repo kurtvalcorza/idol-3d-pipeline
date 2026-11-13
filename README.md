@@ -31,12 +31,17 @@ environment from the carried lock and every stage runs there.
 ## Developing
 
 ```bash
-python -m pip install numpy==2.5.4 pillow==13.0.0 plyfile==1.1.5 huggingface-hub==2.4.0 pytest==8.4.2 ruff==0.17.4
+python -m pip install numpy==2.5.4 pillow==13.0.0 plyfile==1.1.5 huggingface-hub==2.4.0 pytest==8.4.2 ruff==0.17.4 hypothesis==6.170.15
 python -m pip install -e . --no-deps
 ruff check src/idol_3d_pipeline tests tools && pytest
 python tools/build_notebook.py          # regenerate after changing anything the notebook carries
 uv pip compile pyproject.toml --python-version 3.12 --python-platform x86_64-manylinux_2_28 --generate-hashes --only-binary :all: -o tutorials/requirements-colab.lock.txt
 ```
+
+The renderer's maths (Idol's camera, the EWA footprint, compositing, the `.ply` axes) is also formalised in Lean 4
+(`lean/`): 34 machine-checked theorems, each mirrored by a property test in `tests/test_properties.py`, and an
+executable Lean reference that `tests/test_lean_reference.py` compares with the Python. Setup, the map from functions
+to theorems, and what the formalisation found are in [`docs/LEAN.md`](docs/LEAN.md).
 
 ## Licences
 
