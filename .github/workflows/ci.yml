@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # torch and the model libraries are not installed: every test here runs without them (the contract, the
+      # manifests, the renderer, the stage runner's NumPy stages, and notebook parity). Model execution is evidenced
+      # only by hosted runs recorded in docs/release-verification.md.
+      - name: Install the pinned subset the tests need
+        run: python -m pip install --upgrade pip && python -m pip install numpy==2.5.4 pillow==13.0.0 plyfile==1.1.5 huggingface-hub==2.4.0 pytest==8.4.2 ruff==0.17.4 hypothesis==6.170.15
+      - name: Install package without re-resolving dependencies
+        run: python -m pip install -e . --no-deps
+      - name: Lint (the vendored src/idol is excluded; it is checked byte for byte instead)
+        run: ruff check src/idol_3d_pipeline tests tools
+      - name: Tests (offline, CPU, no torch)
+        run: pytest
+      - name: Standalone notebook parity (SRC13 / PAR3)
+        run: python tools/build_notebook.py --check
+
+  lean:
+    # The Lean proofs of the renderer's maths (docs/LEAN.md), and the cross-check of the Python against the Lean reference.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: lean
+          use-mathlib-cache: true
+          # lean/.lake is ~7 GB (Mathlib); fetch the Mathlib cache fresh rather than fill the Actions cache
+          use-github-cache: false
+          build: true
+          # fails on sorry, admit, native_decide or any axiom beyond propext, Classical.choice, Quot.sound
+          axiom-audit: true
+      - name: Build the reference executable
+        working-directory: lean
+        run: lake build idol3d-ref
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Cross-check the Python against the Lean reference
+        run: |
+          python -m pip install numpy==2.5.4 pillow==13.0.0 plyfile==1.1.5 pytest==8.4.2
+          python -m pip install -e . --no-deps
+          test -x lean/.lake/build/bin/idol3d-ref  # the cross-check must run here, not skip
+          pytest tests/test_lean_reference.py
+
+  release-evidence-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain evidence boundary
+        run: |
+          echo "Static/unit CI is not clean-runtime notebook execution evidence."
+          echo "See docs/release-verification.md before promoting the tutorial beyond Candidate."

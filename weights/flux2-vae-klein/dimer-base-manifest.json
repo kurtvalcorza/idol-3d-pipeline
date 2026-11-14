@@ -1,0 +1,33 @@
+{
+  "format": "dimer_hf_snapshot",
+  "formatVersion": 1,
+  "modelKey": "flux2-vae-klein",
+  "modelId": "black-forest-labs/FLUX.2-klein-4B",
+  "revision": "e7b7dc27f91deacad38e78976d1f2b499d76a294",
+  "license": "apache-2.0",
+  "modelFormat": "safetensors (diffusers AutoencoderKLFlux2)",
+  "remoteCode": "none: diffusers from PyPI",
+  "redistribution": "Apache-2.0 permits redistribution; not redistributed here, fetched from the origin at the pinned revision",
+  "assetSpec": "MODEL_ASSET_SPEC (ml-worker integrations/dimer/fleet-specs), section 6 provenance fields",
+  "files": [
+    {
+      "path": "vae/config.json",
+      "bytes": 821,
+      "sha256": "0d6dfb69ae95a5e2ac9836284bbb63d8b38ce67b25ba2dff380752b2a10ab948",
+      "gitBlobSha1": "c3f38eb4c188a96a462519159356bd0fcc28cd14"
+    },
+    {
+      "path": "vae/diffusion_pytorch_model.safetensors",
+      "bytes": 168120878,
+      "sha256": "ca70d2202afe6415bdbcb8793ba8cd99fd159cfe6192381504d6c4d3036e0f04"
+    },
+    {
+      "path": "LICENSE.md",
+      "bytes": 9584,
+      "sha256": "ca02bc51900ab07789d1b70283329e7137f5af98f5161c23a1c81fc38a4af1fe",
+      "gitBlobSha1": "0afa7632c1a195ea6627a3c53e6ebf18d1be3aa5"
+    }
+  ],
+  "totalBytes": 168131283,
+  "note": "Only the VAE of FLUX.2 [klein] 4B is staged (the 4B transformer and text encoder are never fetched). The VAE is presumed to be the FLUX.2 [dev] VAE stored in bf16; the optional vae_check stage tests that presumption."
+}

@@ -1,0 +1,129 @@
+{
+  "samples": [
+    {
+      "id": "backpack",
+      "structure": {
+        "gaussians": 65536,
+        "finite": true,
+        "extent": [
+          [
+            -0.4961,
+            -0.3786,
+            -0.4484
+          ],
+          [
+            0.4963,
+            0.3776,
+            0.4575
+          ]
+        ],
+        "outside_bounds": 0,
+        "opacity": {
+          "p05": 0.53779,
+          "median": 0.96019,
+          "p95": 0.99954
+        },
+        "largest_scale": {
+          "p05": 0.00118,
+          "median": 0.00418,
+          "p95": 0.01556
+        },
+        "problems": [],
+        "verdict": "well-formed"
+      },
+      "ply_roundtrip": {
+        "vertices": 65536,
+        "standard_fields": true,
+        "finite": true,
+        "position_max_abs_error": 0.0,
+        "verified": true
+      },
+      "silhouette_iou": 0.8658,
+      "convention_used": "calibrated",
+      "calibration": {
+        "fov_scale": 0.6,
+        "yaw_offset_deg": 25.0,
+        "pitch_offset_deg": 0.0
+      },
+      "silhouette_iou_uncalibrated_diagnostic": {
+        "toward_camera": 0.3283,
+        "toward_camera_mirrored": 0.3258,
+        "view_direction": 0.3056,
+        "view_direction_mirrored": 0.3056
+      },
+      "silhouette_iou_note": "under the fixed camera calibration in render.py (field of view x 0.6, yaw + 25 deg), applied unchanged to every splat; the uncalibrated readings are diagnostics only",
+      "renderer": {
+        "pairs": 3491565,
+        "cut_at_max_radius": 329,
+        "kind": "approximate NumPy EWA splatting (render.py), not the 3DGS rasterizer"
+      }
+    },
+    {
+      "id": "porcini",
+      "structure": {
+        "gaussians": 65536,
+        "finite": true,
+        "extent": [
+          [
+            -0.3631,
+            -0.377,
+            -0.4191
+          ],
+          [
+            0.3645,
+            0.3733,
+            0.4969
+          ]
+        ],
+        "outside_bounds": 0,
+        "opacity": {
+          "p05": 0.745,
+          "median": 0.99704,
+          "p95": 0.99999
+        },
+        "largest_scale": {
+          "p05": 0.00104,
+          "median": 0.00305,
+          "p95": 0.01124
+        },
+        "problems": [],
+        "verdict": "well-formed"
+      },
+      "ply_roundtrip": {
+        "vertices": 65536,
+        "standard_fields": true,
+        "finite": true,
+        "position_max_abs_error": 0.0,
+        "verified": true
+      },
+      "silhouette_iou": 0.874,
+      "convention_used": "calibrated",
+      "calibration": {
+        "fov_scale": 0.6,
+        "yaw_offset_deg": 25.0,
+        "pitch_offset_deg": 0.0
+      },
+      "silhouette_iou_uncalibrated_diagnostic": {
+        "toward_camera": 0.3322,
+        "toward_camera_mirrored": 0.2889,
+        "view_direction": 0.2949,
+        "view_direction_mirrored": 0.2597
+      },
+      "silhouette_iou_note": "under the fixed camera calibration in render.py (field of view x 0.6, yaw + 25 deg), applied unchanged to every splat; the uncalibrated readings are diagnostics only",
+      "renderer": {
+        "pairs": 1920068,
+        "cut_at_max_radius": 76,
+        "kind": "approximate NumPy EWA splatting (render.py), not the 3DGS rasterizer"
+      }
+    }
+  ],
+  "camera_calibration": {
+    "fov_scale": 0.6,
+    "yaw_offset_deg": 25.0,
+    "pitch_offset_deg": 0.0,
+    "convention": "toward_camera",
+    "fitted": "2026-11-10, two CPU-generated splats (backpack, porcini), see the module docstring"
+  },
+  "evidence_level": "structure and file integrity are checked; silhouette IoU covers the visible side only, through an approximate renderer; the unseen sides have no reference here",
+  "verdict": "passed: every splat well-formed, every .ply read back, every mask replica equal to the SDK's input"
+}

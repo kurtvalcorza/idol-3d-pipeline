@@ -1,0 +1,43 @@
+[project]
+name = "idol-3d-pipeline"
+version = "0.1.0"
+description = "DIMER task-inference pipeline for Idol (speridlabs/idol): one object image to a 3D Gaussian splat, with the Apache-2.0 FLUX.2 [klein] VAE in place of the FLUX.2 [dev] one, digest-verified weights, a vendored pinned Idol SDK, rendered previews and an input-view silhouette check"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { file = "LICENSE" }
+authors = [{ name = "Kurt Valcorza" }]
+dependencies = [
+  "torch==2.14.0",
+  "torchvision==0.29.2",
+  "transformers==5.22.2",
+  "diffusers==0.42.1",
+  "accelerate==1.15.0",
+  "huggingface-hub==2.4.0",
+  "safetensors==0.8.0",
+  "tensordict==0.15.5",
+  "numpy==2.5.4",
+  "pillow==13.0.0",
+  "plyfile==1.1.5",
+  "tqdm==4.70.1",
+]
+[project.optional-dependencies]
+dev = ["pytest==8.4.2", "ruff==0.17.4", "hypothesis==6.170.15"]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+[tool.hatch.build.targets.wheel]
+packages = ["src/idol_3d_pipeline", "src/idol"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 130
+target-version = "py312"
+src = ["src", "tests"]
+# src/idol is the upstream Idol SDK carried verbatim at a pinned commit; it is never reformatted or linted here.
+extend-exclude = ["tutorials", "src/idol"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
